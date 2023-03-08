@@ -1,4 +1,4 @@
-use smithay::{delegate_xdg_shell, wayland::shell::xdg::XdgShellHandler};
+use smithay::{delegate_xdg_shell, desktop::Window, wayland::shell::xdg::XdgShellHandler};
 
 use crate::FlyJa;
 
@@ -19,7 +19,9 @@ impl XdgShellHandler for FlyJa {
         // TODO:
     }
     fn new_toplevel(&mut self, surface: smithay::wayland::shell::xdg::ToplevelSurface) {
-        // TODO:
+        let window = Window::new(surface);
+        println!("create a new surface");
+        self.space.map_element(window, (0, 0), false);
     }
     fn xdg_shell_state(&mut self) -> &mut smithay::wayland::shell::xdg::XdgShellState {
         &mut self.xdg_shell_state

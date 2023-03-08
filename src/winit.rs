@@ -19,6 +19,9 @@ use smithay::{
     utils::{Rectangle, Transform},
 };
 use std::time::Duration;
+
+pub const OUTPUT_NAME: &str = "winit";
+
 pub fn run_winit() -> Result<(), Box<dyn std::error::Error>> {
     let mut event_loop: EventLoop<CalloopData> = EventLoop::try_new()?;
 
@@ -114,7 +117,9 @@ fn winit_dispatch(
                 None,
             );
         }
-        WinitEvent::Input(event) => (), //state.process_input_event(event),
+        WinitEvent::Input(event) => {
+            state.process_input_event(&display.handle(), event, OUTPUT_NAME)
+        } //state.process_input_event(event),
         _ => (),
     });
 

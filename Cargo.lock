@@ -375,6 +375,7 @@ dependencies = [
 name = "flyja"
 version = "0.1.0"
 dependencies = [
+ "bitflags",
  "smithay",
  "tracing",
  "tracing-subscriber",

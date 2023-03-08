@@ -1,6 +1,8 @@
 use smithay::{
-    backend::input::{InputBackend,Event, InputEvent, KeyboardKeyEvent},
-    reexports::wayland_server::DisplayHandle, utils::SERIAL_COUNTER,
+    backend::input::{Event, InputBackend, InputEvent, KeyState, KeyboardKeyEvent},
+    input::keyboard::{keysyms as xkb, FilterResult, Keysym, ModifiersState},
+    reexports::wayland_server::DisplayHandle,
+    utils::SERIAL_COUNTER,
 };
 
 use crate::FlyJa;
@@ -29,15 +31,25 @@ enum KeyAction {
 impl FlyJa {
     pub fn process_input_event<I: InputBackend>(
         &mut self,
-        dh: &DisplayHandle,
+        _dh: &DisplayHandle,
         event: InputEvent<I>,
-        output_name: &str,
+        _output_name: &str,
     ) {
         match event {
-            InputEvent::Keyboard { event } => {}
-            InputEvent::PointerMotionAbsolute { event } => {}
-            InputEvent::PointerButton { event } => {}
-            InputEvent::PointerAxis { event } => {}
+            InputEvent::Keyboard { event } => {
+                if let KeyAction::Run(cmd) = self.keyboard_key_to_action::<I>(event) {
+                    if let Err(e) = std::process::Command::new(&cmd)
+                        .env("WAYLAND_DISPLAY", self.socket_name.clone())
+                        .spawn()
+                    {
+                        tracing::error!(cmd, err = %e, "Failed to start program");
+                    }
+                }
+                tracing::info!("keyboard");
+            }
+            InputEvent::PointerMotionAbsolute { .. } => {}
+            InputEvent::PointerButton { .. } => {}
+            InputEvent::PointerAxis { .. } => {}
             _ => (),
         }
     }
@@ -50,6 +62,57 @@ impl FlyJa {
         tracing::debug!(keycode, ?state, "key");
         let serial = SERIAL_COUNTER.next_serial();
         let time = Event::time_msec(&evt);
-        todo!()
+        let keyboard = self.seat.get_keyboard().unwrap();
+        keyboard
+            .input(
+                self,
+                keycode,
+                state,
+                serial,
+                time,
+                |_, modifiers, handle| {
+                    let keysym = handle.modified_sym();
+                    if let KeyState::Pressed = state {
+                        let action = process_keyboard_shortcut(*modifiers, keysym);
+                        action
+                            .map(FilterResult::Intercept)
+                            .unwrap_or(FilterResult::Forward)
+                    } else {
+                        FilterResult::Forward
+                    }
+                },
+            )
+            .unwrap_or(KeyAction::None)
+    }
+}
+fn process_keyboard_shortcut(modifiers: ModifiersState, keysym: Keysym) -> Option<KeyAction> {
+    if modifiers.ctrl && modifiers.alt && keysym == xkb::KEY_BackSpace
+        || modifiers.logo && keysym == xkb::KEY_q
+    {
+        // ctrl+alt+backspace = quit
+        // logo + q = quit
+        Some(KeyAction::Quit)
+    } else if (xkb::KEY_XF86Switch_VT_1..=xkb::KEY_XF86Switch_VT_12).contains(&keysym) {
+        // VTSwitch
+        Some(KeyAction::VtSwitch(
+            (keysym - xkb::KEY_XF86Switch_VT_1 + 1) as i32,
+        ))
+    } else if modifiers.logo && keysym == xkb::KEY_Return {
+        // run terminal
+        Some(KeyAction::Run("wezterm".into()))
+    } else if modifiers.logo && (xkb::KEY_1..=xkb::KEY_9).contains(&keysym) {
+        Some(KeyAction::Screen((keysym - xkb::KEY_1) as usize))
+    } else if modifiers.logo && modifiers.shift && keysym == xkb::KEY_M {
+        Some(KeyAction::ScaleDown)
+    } else if modifiers.logo && modifiers.shift && keysym == xkb::KEY_P {
+        Some(KeyAction::ScaleUp)
+    } else if modifiers.logo && modifiers.shift && keysym == xkb::KEY_W {
+        Some(KeyAction::TogglePreview)
+    } else if modifiers.logo && modifiers.shift && keysym == xkb::KEY_R {
+        Some(KeyAction::RotateOutput)
+    } else if modifiers.logo && modifiers.shift && keysym == xkb::KEY_T {
+        Some(KeyAction::ToggleTint)
+    } else {
+        None
     }
 }

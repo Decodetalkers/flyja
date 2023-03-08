@@ -1,7 +1,7 @@
 mod handle;
+mod input;
 mod state;
 mod winit;
-mod input;
 
 pub use state::FlyJa;
 

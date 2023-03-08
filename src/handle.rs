@@ -1,7 +1,10 @@
 mod compositor;
 mod xdg_shell;
 use smithay::{
-    delegate_seat, input::SeatHandler, reexports::wayland_server::protocol::wl_surface::WlSurface, wayland::data_device::{DataDeviceHandler, ClientDndGrabHandler, ServerDndGrabHandler}, delegate_data_device, delegate_output,
+    delegate_data_device, delegate_output, delegate_seat,
+    input::SeatHandler,
+    reexports::wayland_server::protocol::wl_surface::WlSurface,
+    wayland::data_device::{ClientDndGrabHandler, DataDeviceHandler, ServerDndGrabHandler},
 };
 
 use crate::state::FlyJa;
