@@ -28,14 +28,14 @@ fn main() {
     let arg = ::std::env::args().nth(1);
     match arg.as_ref().map(|s| &s[..]) {
         Some("--winit") => {
-            tracing::info!("Starting anvil with winit backend");
+            tracing::info!("Starting flyja with winit backend");
             run_winit().unwrap();
         }
         Some(other) => {
             tracing::error!("Unknown backend: {}", other);
         }
         None => {
-            println!("USAGE: anvil --backend");
+            println!("USAGE: flyja --backend");
             println!();
             println!("Possible backends are:");
             for b in POSSIBLE_BACKENDS {

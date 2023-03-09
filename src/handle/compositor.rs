@@ -37,6 +37,7 @@ impl CompositorHandler for FlyJa {
                 window.on_commit();
             }
         }
+        // this make window can be shown
         handle_commit(&self.space, surface);
         // TODO:
     }
