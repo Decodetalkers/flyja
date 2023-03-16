@@ -1,13 +1,14 @@
 use std::{ffi::OsString, os::unix::io::AsRawFd};
 
 use smithay::{
-    desktop::{Space, Window},
+    desktop::{Space, Window, WindowSurfaceType},
     input::Seat,
-    input::SeatState,
+    input::{SeatState, pointer::PointerHandle},
     reexports::{
         calloop::{generic::Generic, EventLoop, Interest, LoopSignal, Mode, PostAction},
-        wayland_server::{backend::ClientData, Display},
+        wayland_server::{backend::ClientData, Display, protocol::wl_surface::WlSurface},
     },
+    utils::{Logical,Point},
     wayland::{
         compositor::CompositorState, data_device::DataDeviceState, output::OutputManagerState,
         shell::xdg::XdgShellState, shm::ShmState, socket::ListeningSocketSource,
@@ -111,6 +112,18 @@ impl FlyJa {
             )
             .unwrap();
         socket_name
+    }
+        
+    pub fn surface_under_pointer(
+        &self,
+        pointer: &PointerHandle<Self>,
+    ) -> Option<(WlSurface, Point<i32, Logical>)> {
+        let pos = pointer.current_location();
+        self.space.element_under(pos).and_then(|(window, location)| {
+            window
+                .surface_under(pos - location.to_f64(), WindowSurfaceType::ALL)
+                .map(|(s, p)| (s, p + location))
+        })
     }
 }
 

@@ -1,7 +1,13 @@
 use smithay::{
-    backend::input::{Event, InputBackend, InputEvent, KeyState, KeyboardKeyEvent},
-    input::keyboard::{keysyms as xkb, FilterResult, Keysym, ModifiersState},
-    reexports::wayland_server::DisplayHandle,
+    backend::input::{
+        AbsolutePositionEvent, ButtonState, Event, InputBackend, InputEvent, KeyState,
+        KeyboardKeyEvent, PointerButtonEvent,
+    },
+    input::{
+        keyboard::{keysyms as xkb, FilterResult, Keysym, ModifiersState},
+        pointer::{ButtonEvent, MotionEvent},
+    },
+    reexports::wayland_server::{protocol::wl_surface::WlSurface, DisplayHandle},
     utils::SERIAL_COUNTER,
 };
 
@@ -47,8 +53,72 @@ impl FlyJa {
                 }
                 tracing::info!("keyboard");
             }
-            InputEvent::PointerMotionAbsolute { .. } => {}
-            InputEvent::PointerButton { .. } => {}
+            // Mouse or touch pad
+            InputEvent::PointerButton { event } => {
+                let pointer = self.seat.get_pointer().unwrap();
+                let keyboard = self.seat.get_keyboard().unwrap();
+
+                let serial = SERIAL_COUNTER.next_serial();
+
+                let button = event.button_code();
+
+                let button_state = event.state();
+
+                if ButtonState::Pressed == button_state && !pointer.is_grabbed() {
+                    if let Some((window, _loc)) = self
+                        .space
+                        .element_under(pointer.current_location())
+                        .map(|(w, l)| (w.clone(), l))
+                    {
+                        self.space.raise_element(&window, true);
+                        keyboard.set_focus(
+                            self,
+                            Some(window.toplevel().wl_surface().clone()),
+                            serial,
+                        );
+                        self.space.elements().for_each(|window| {
+                            window.toplevel().send_configure();
+                        });
+                    } else {
+                        self.space.elements().for_each(|window| {
+                            window.set_activated(false);
+                            window.toplevel().send_configure();
+                        });
+                        keyboard.set_focus(self, Option::<WlSurface>::None, serial);
+                    }
+                }
+                pointer.button(
+                    self,
+                    &ButtonEvent {
+                        button,
+                        state: button_state,
+                        serial,
+                        time: event.time_msec(),
+                    },
+                );
+            }
+            InputEvent::PointerMotionAbsolute { event } => {
+                let output = self.space.outputs().next().unwrap();
+
+                let output_geo = self.space.output_geometry(output).unwrap();
+
+                let pos = event.position_transformed(output_geo.size) + output_geo.loc.to_f64();
+                let serial = SERIAL_COUNTER.next_serial();
+
+                let pointer = self.seat.get_pointer().unwrap();
+
+                let under = self.surface_under_pointer(&pointer);
+
+                pointer.motion(
+                    self,
+                    under,
+                    &MotionEvent {
+                        location: pos,
+                        serial,
+                        time: event.time_msec(),
+                    },
+                );
+            }
             InputEvent::PointerAxis { .. } => {}
             _ => (),
         }

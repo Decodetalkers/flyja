@@ -1,14 +1,16 @@
 use smithay::{
     backend::renderer::utils::on_commit_buffer_handler,
     delegate_compositor, delegate_shm,
+    desktop::{Space, Window},
+    reexports::wayland_protocols::xdg::shell::server::xdg_toplevel,
+    reexports::wayland_server::protocol::wl_surface::WlSurface,
+    utils::{Logical, Point, Size},
     wayland::{
         buffer::BufferHandler,
-        compositor::{get_parent, is_sync_subsurface,with_states, CompositorHandler},
+        compositor::{get_parent, is_sync_subsurface, with_states, CompositorHandler},
+        shell::xdg::XdgToplevelSurfaceData,
         shm::ShmHandler,
-        shell::xdg::XdgToplevelSurfaceData
     },
-    desktop::{Space, Window},
-    reexports::wayland_server::protocol::wl_surface::WlSurface
 };
 
 use crate::FlyJa;
@@ -38,7 +40,7 @@ impl CompositorHandler for FlyJa {
             }
         }
         // this make window can be shown
-        handle_commit(&self.space, surface);
+        handle_commit(&mut self.space, surface);
         // TODO:
     }
 }
@@ -56,7 +58,7 @@ impl ShmHandler for FlyJa {
         &self.shm_state
     }
 }
-pub fn handle_commit(space: &Space<Window>, surface: &WlSurface) -> Option<()> {
+pub fn handle_commit(space: &mut Space<Window>, surface: &WlSurface) -> Option<()> {
     let window = space
         .elements()
         .find(|w| w.toplevel().wl_surface() == surface)
@@ -75,6 +77,10 @@ pub fn handle_commit(space: &Space<Window>, surface: &WlSurface) -> Option<()> {
     if !initial_configure_sent {
         window.toplevel().send_configure();
     }
+    let mut point = Point::default();
+    point.x = 300;
+    point.y = 300;
+    space.map_element(window, point, true);
 
     Some(())
 }
