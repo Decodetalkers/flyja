@@ -1,10 +1,12 @@
 use smithay::{
     backend::renderer::utils::on_commit_buffer_handler,
-    delegate_compositor, delegate_shm,
+    delegate_compositor,
+    delegate_shm,
     desktop::{Space, Window},
-    reexports::wayland_protocols::xdg::shell::server::xdg_toplevel,
+    //reexports::wayland_protocols::xdg::shell::server::xdg_toplevel,
     reexports::wayland_server::protocol::wl_surface::WlSurface,
-    utils::{Logical, Point, Size},
+    utils::Point,
+    //utils::{Logical, Point, Size},
     wayland::{
         buffer::BufferHandler,
         compositor::{get_parent, is_sync_subsurface, with_states, CompositorHandler},
@@ -48,7 +50,7 @@ impl CompositorHandler for FlyJa {
 impl BufferHandler for FlyJa {
     fn buffer_destroyed(
         &mut self,
-        buffer: &smithay::reexports::wayland_server::protocol::wl_buffer::WlBuffer,
+        _buffer: &smithay::reexports::wayland_server::protocol::wl_buffer::WlBuffer,
     ) {
     }
 }
