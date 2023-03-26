@@ -31,7 +31,7 @@ impl XdgShellHandler for FlyJa {
         for window in self.space.elements() {
             let surface = window.toplevel();
             surface.with_pending_state(|state| {
-                let size = Size::from((3000, 3000));
+                let size = Size::from((1000, 1000));
                 state.size = Some(size);
             });
             surface.send_configure();
