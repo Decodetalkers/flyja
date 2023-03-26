@@ -5,7 +5,8 @@ use smithay::{
     desktop::{Space, Window},
     //reexports::wayland_protocols::xdg::shell::server::xdg_toplevel,
     reexports::wayland_server::protocol::wl_surface::WlSurface,
-    utils::Point,
+    //utils::Size,
+    //utils::Point,
     //utils::{Logical, Point, Size},
     wayland::{
         buffer::BufferHandler,
@@ -60,6 +61,7 @@ impl ShmHandler for FlyJa {
         &self.shm_state
     }
 }
+
 pub fn handle_commit(space: &mut Space<Window>, surface: &WlSurface) -> Option<()> {
     let window = space
         .elements()
@@ -79,10 +81,7 @@ pub fn handle_commit(space: &mut Space<Window>, surface: &WlSurface) -> Option<(
     if !initial_configure_sent {
         window.toplevel().send_configure();
     }
-    let mut point = Point::default();
-    point.x = 300;
-    point.y = 300;
-    space.map_element(window, point, true);
+
 
     Some(())
 }
