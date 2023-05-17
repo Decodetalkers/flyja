@@ -1,12 +1,11 @@
 use smithay::{
     delegate_xdg_shell,
     desktop::Window,
-    utils::Size, // utils::{Size, Logical}, reexports::wayland_protocols::xdg::shell::server::xdg_toplevel
     //input::{pointer::Focus, Seat},
     wayland::shell::xdg::XdgShellHandler,
 };
 
-use crate::FlyJa;
+use crate::{FlyJa, state::ResizeState};
 
 impl XdgShellHandler for FlyJa {
     fn grab(
@@ -26,16 +25,10 @@ impl XdgShellHandler for FlyJa {
     }
     fn new_toplevel(&mut self, surface: smithay::wayland::shell::xdg::ToplevelSurface) {
         let window = Window::new(surface);
-        self.space.map_element(window.clone(), (100, 100), false);
+        self.space.map_element(window.clone(), (0, 0), false);
 
-        for window in self.space.elements() {
-            let surface = window.toplevel();
-            surface.with_pending_state(|state| {
-                let size = Size::from((1000, 1000));
-                state.size = Some(size);
-            });
-            surface.send_configure();
-        }
+        self.reseize_state = ResizeState::NewTopCreated;
+
     }
     fn xdg_shell_state(&mut self) -> &mut smithay::wayland::shell::xdg::XdgShellState {
         &mut self.xdg_shell_state

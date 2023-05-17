@@ -18,6 +18,11 @@ use smithay::{
 use crate::CalloopData;
 use std::sync::Arc;
 
+pub enum ResizeState {
+    NewTopCreated,
+    ResizeFinished,
+}
+
 pub struct FlyJa {
     pub start_time: std::time::Instant,
     pub socket_name: OsString,
@@ -34,6 +39,8 @@ pub struct FlyJa {
     pub data_device_state: DataDeviceState,
 
     pub seat: Seat<Self>,
+
+    pub reseize_state: ResizeState,
 }
 
 impl FlyJa {
@@ -75,6 +82,7 @@ impl FlyJa {
             seat_state,
             data_device_state,
             seat,
+            reseize_state: ResizeState::ResizeFinished,
         }
     }
     fn init_wayland_listener(
