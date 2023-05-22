@@ -5,7 +5,7 @@ use smithay::{
     wayland::shell::xdg::XdgShellHandler,
 };
 
-use crate::{FlyJa, state::ResizeState};
+use crate::{state::ResizeState, FlyJa};
 
 impl XdgShellHandler for FlyJa {
     fn grab(
@@ -28,7 +28,10 @@ impl XdgShellHandler for FlyJa {
         self.space.map_element(window.clone(), (0, 0), false);
 
         self.reseize_state = ResizeState::NewTopCreated;
+    }
 
+    fn toplevel_destroyed(&mut self, _surface: smithay::wayland::shell::xdg::ToplevelSurface) {
+        // TODO: resize again
     }
     fn xdg_shell_state(&mut self) -> &mut smithay::wayland::shell::xdg::XdgShellState {
         &mut self.xdg_shell_state
