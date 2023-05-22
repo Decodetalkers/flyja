@@ -5,9 +5,6 @@ use smithay::{
     desktop::{Space, Window},
     //reexports::wayland_protocols::xdg::shell::server::xdg_toplevel,
     reexports::wayland_server::protocol::wl_surface::WlSurface,
-    //utils::Size,
-    //utils::Point,
-    utils::Size,
     wayland::{
         buffer::BufferHandler,
         compositor::{get_parent, is_sync_subsurface, with_states, CompositorHandler},
@@ -16,7 +13,7 @@ use smithay::{
     },
 };
 
-use crate::{state::ResizeState, FlyJa};
+use crate::FlyJa;
 
 //use super::xdg_shell;
 
@@ -44,18 +41,7 @@ impl CompositorHandler for FlyJa {
         }
         // this make window can be shown
         handle_commit(&mut self.space, surface);
-        if let ResizeState::NewTopCreated = self.reseize_state {
-            for window in self.space.elements() {
-                let surface = window.toplevel();
-                surface.with_pending_state(|state| {
-                    let size = Size::from((10000, 10000));
-                    state.size = Some(size);
-                });
-                surface.send_configure();
-            }
-            self.reseize_state = ResizeState::ResizeFinished;
-        }
-        // TODO:
+        self.handle_resize_event();
     }
 }
 

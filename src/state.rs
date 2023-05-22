@@ -8,7 +8,7 @@ use smithay::{
         calloop::{generic::Generic, EventLoop, Interest, LoopSignal, Mode, PostAction},
         wayland_server::{backend::ClientData, protocol::wl_surface::WlSurface, Display},
     },
-    utils::{Logical, Point},
+    utils::{Logical, Point, Size},
     wayland::{
         compositor::CompositorState, data_device::DataDeviceState, output::OutputManagerState,
         shell::xdg::XdgShellState, shm::ShmState, socket::ListeningSocketSource,
@@ -134,6 +134,20 @@ impl FlyJa {
                     .surface_under(pos - location.to_f64(), WindowSurfaceType::ALL)
                     .map(|(s, p)| (s, p + location))
             })
+    }
+
+    pub fn handle_resize_event(&mut self) {
+        if let ResizeState::NewTopCreated = self.reseize_state {
+            for window in self.space.elements() {
+                let surface = window.toplevel();
+                surface.with_pending_state(|state| {
+                    let size = Size::from((1000, 1000));
+                    state.size = Some(size);
+                });
+                surface.send_configure();
+            }
+            self.reseize_state = ResizeState::ResizeFinished;
+        }
     }
 }
 

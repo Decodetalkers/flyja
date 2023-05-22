@@ -51,7 +51,6 @@ impl FlyJa {
                         tracing::error!(cmd, err = %e, "Failed to start program");
                     }
                 }
-                tracing::info!("keyboard");
             }
             // Mouse or touch pad
             InputEvent::PointerButton { event } => {
