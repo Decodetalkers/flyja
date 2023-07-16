@@ -1,19 +1,19 @@
 use smithay::{
     backend::renderer::utils::on_commit_buffer_handler,
-    delegate_compositor,
-    delegate_shm,
+    delegate_compositor, delegate_shm,
     desktop::{Space, Window},
-    //reexports::wayland_protocols::xdg::shell::server::xdg_toplevel,
-    reexports::wayland_server::protocol::wl_surface::WlSurface,
+    reexports::wayland_server::{protocol::wl_surface::WlSurface, Client},
     wayland::{
         buffer::BufferHandler,
-        compositor::{get_parent, is_sync_subsurface, with_states, CompositorHandler},
+        compositor::{
+            get_parent, is_sync_subsurface, with_states, CompositorClientState, CompositorHandler,
+        },
         shell::xdg::XdgToplevelSurfaceData,
         shm::ShmHandler,
     },
 };
 
-use crate::FlyJa;
+use crate::{state::ClientState, FlyJa};
 
 //use super::xdg_shell;
 
@@ -21,11 +21,16 @@ impl CompositorHandler for FlyJa {
     fn compositor_state(&mut self) -> &mut smithay::wayland::compositor::CompositorState {
         &mut self.compositor_state
     }
+
+    fn client_compositor_state<'a>(&self, client: &'a Client) -> &'a CompositorClientState {
+        &client.get_data::<ClientState>().unwrap().compositor_state
+    }
+
     fn commit(
         &mut self,
         surface: &smithay::reexports::wayland_server::protocol::wl_surface::WlSurface,
     ) {
-        on_commit_buffer_handler(surface);
+        on_commit_buffer_handler::<Self>(surface);
         if !is_sync_subsurface(surface) {
             let mut root = surface.clone();
             while let Some(parent) = get_parent(&root) {

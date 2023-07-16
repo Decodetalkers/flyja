@@ -3,8 +3,8 @@ use crate::FlyJa;
 use smithay::{
     backend::{
         renderer::{
-            damage::DamageTrackedRenderer, element::surface::WaylandSurfaceRenderElement,
-            gles2::Gles2Renderer,
+            damage::OutputDamageTracker, element::surface::WaylandSurfaceRenderElement,
+            gles::GlesRenderer,
         },
         winit::{self, WinitError, WinitEvent, WinitEventLoop, WinitGraphicsBackend},
     },
@@ -70,7 +70,7 @@ fn init_winit(
 
     state.space.map_output(&output, (0, 0));
 
-    let mut damage_tracked_renderer = DamageTrackedRenderer::from_output(&output);
+    let mut damage_tracked_renderer = OutputDamageTracker::from_output(&output);
 
     std::env::set_var("WAYLAND_DISPLAY", &state.socket_name);
 
@@ -95,11 +95,11 @@ fn init_winit(
     Ok(())
 }
 fn winit_dispatch(
-    backend: &mut WinitGraphicsBackend<Gles2Renderer>,
+    backend: &mut WinitGraphicsBackend<GlesRenderer>,
     winit: &mut WinitEventLoop,
     data: &mut CalloopData,
     output: &Output,
-    damage_tracked_renderer: &mut DamageTrackedRenderer,
+    damage_tracked_renderer: &mut OutputDamageTracker,
     full_redraw: &mut u8,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let display = &mut data.display;
@@ -138,9 +138,10 @@ fn winit_dispatch(
     let damage = Rectangle::from_loc_and_size((0, 0), size);
 
     backend.bind()?;
-    smithay::desktop::space::render_output::<_, WaylandSurfaceRenderElement<Gles2Renderer>, _, _>(
+    smithay::desktop::space::render_output::<_, WaylandSurfaceRenderElement<GlesRenderer>, _, _>(
         output,
         backend.renderer(),
+        1.0,
         0,
         [&state.space],
         &[],

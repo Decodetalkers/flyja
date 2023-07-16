@@ -35,6 +35,7 @@ delegate_seat!(FlyJa);
 //
 //
 impl DataDeviceHandler for FlyJa {
+    type SelectionUserData = ();
     fn data_device_state(&self) -> &smithay::wayland::data_device::DataDeviceState {
         &self.data_device_state
     }

@@ -10,7 +10,7 @@ use smithay::{
     },
     utils::{Logical, Point, Size},
     wayland::{
-        compositor::CompositorState, data_device::DataDeviceState, output::OutputManagerState,
+        compositor::{CompositorState, CompositorClientState}, data_device::DataDeviceState, output::OutputManagerState,
         shell::xdg::XdgShellState, shm::ShmState, socket::ListeningSocketSource,
     },
 };
@@ -101,7 +101,7 @@ impl FlyJa {
                 state
                     .display
                     .handle()
-                    .insert_client(client_stream, Arc::new(ClientState))
+                    .insert_client(client_stream, Arc::new(ClientState::default()))
                     .unwrap();
             })
             .expect("Failed");
@@ -151,7 +151,10 @@ impl FlyJa {
     }
 }
 
-pub struct ClientState;
+#[derive(Default)]
+pub struct ClientState {
+    pub compositor_state: CompositorClientState,
+}
 impl ClientData for ClientState {
     fn initialized(&self, _client_id: smithay::reexports::wayland_server::backend::ClientId) {}
     fn disconnected(
