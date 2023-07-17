@@ -1,8 +1,8 @@
 mod handle;
 mod input;
+mod shell;
 mod state;
 mod winit;
-
 pub use state::FlyJa;
 
 use smithay::reexports::wayland_server::Display;
