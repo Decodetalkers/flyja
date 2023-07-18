@@ -1,7 +1,7 @@
 use smithay::{
     backend::renderer::utils::on_commit_buffer_handler,
     delegate_compositor, delegate_shm,
-    desktop::{Space, Window},
+    desktop::{Space},
     reexports::wayland_server::{protocol::wl_surface::WlSurface, Client},
     wayland::{
         buffer::BufferHandler,
@@ -13,7 +13,7 @@ use smithay::{
     },
 };
 
-use crate::{state::ClientState, FlyJa};
+use crate::{state::ClientState, FlyJa, shell::WindowElement};
 
 //use super::xdg_shell;
 
@@ -64,7 +64,7 @@ impl ShmHandler for FlyJa {
     }
 }
 
-pub fn handle_commit(space: &mut Space<Window>, surface: &WlSurface) -> Option<()> {
+pub fn handle_commit(space: &mut Space<WindowElement>, surface: &WlSurface) -> Option<()> {
     let window = space
         .elements()
         .find(|w| w.toplevel().wl_surface() == surface)

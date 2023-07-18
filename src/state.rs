@@ -1,7 +1,7 @@
 use std::{ffi::OsString, os::unix::io::AsRawFd};
 
 use smithay::{
-    desktop::{Space, Window, WindowSurfaceType},
+    desktop::{Space, WindowSurfaceType},
     input::Seat,
     input::{pointer::PointerHandle, SeatState},
     reexports::{
@@ -15,7 +15,7 @@ use smithay::{
     },
 };
 
-use crate::CalloopData;
+use crate::{CalloopData, shell::WindowElement};
 use std::sync::Arc;
 
 pub enum ResizeState {
@@ -27,7 +27,7 @@ pub struct FlyJa {
     pub start_time: std::time::Instant,
     pub socket_name: OsString,
 
-    pub space: Space<Window>,
+    pub space: Space<WindowElement>,
     pub loop_signal: LoopSignal,
 
     // State
