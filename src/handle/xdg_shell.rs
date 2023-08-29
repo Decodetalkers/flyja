@@ -1,7 +1,17 @@
 use smithay::{
     delegate_xdg_shell,
     desktop::Space,
-    reexports::wayland_server::protocol::{wl_seat, wl_surface},
+    input::{
+        pointer::{Focus, GrabStartData},
+        Seat,
+    },
+    reexports::{
+        wayland_protocols::xdg::shell::server::xdg_toplevel,
+        wayland_server::{
+            protocol::{wl_seat, wl_surface},
+            Resource,
+        },
+    },
     utils::Serial,
     wayland::{
         compositor::with_states,
@@ -9,7 +19,7 @@ use smithay::{
     },
 };
 
-use crate::{shell::WindowElement, state::ResizeState, FlyJa};
+use crate::{grab::move_grab::MoveSurfaceGrab, shell::WindowElement, state::ResizeState, FlyJa};
 
 impl XdgShellHandler for FlyJa {
     fn grab(
@@ -37,10 +47,40 @@ impl XdgShellHandler for FlyJa {
     fn toplevel_destroyed(&mut self, _surface: smithay::wayland::shell::xdg::ToplevelSurface) {
         // TODO: resize again
     }
+
     fn xdg_shell_state(&mut self) -> &mut smithay::wayland::shell::xdg::XdgShellState {
         &mut self.xdg_shell_state
     }
-    fn move_request(&mut self, _surface: ToplevelSurface, _seat: wl_seat::WlSeat, _serial: Serial) {
+
+    fn move_request(&mut self, surface: ToplevelSurface, seat: wl_seat::WlSeat, serial: Serial) {
+        let seat: Seat<FlyJa> = Seat::from_resource(&seat).unwrap();
+        let wl_surface = surface.wl_surface();
+        let Some(start_data) = check_grab(&seat, wl_surface, serial) else {
+            return;
+        };
+        let pointer = seat.get_pointer().unwrap();
+        let window = self
+            .space
+            .elements()
+            .find(|w| w.toplevel().wl_surface() == wl_surface)
+            .unwrap()
+            .clone();
+
+        let initial_window_location = self.space.element_location(&window).unwrap();
+
+        surface.with_pending_state(|state| {
+            state.states.set(xdg_toplevel::State::Resizing);
+        });
+
+        surface.send_pending_configure();
+
+        let grab = MoveSurfaceGrab {
+            start_data,
+            window,
+            initial_window_location,
+        };
+
+        pointer.set_grab(self, grab, serial, Focus::Clear);
     }
 }
 
@@ -70,3 +110,22 @@ pub fn handle_commit(
     Some(())
 }
 delegate_xdg_shell!(FlyJa);
+
+fn check_grab(
+    seat: &Seat<FlyJa>,
+    surface: &wl_surface::WlSurface,
+    serial: Serial,
+) -> Option<GrabStartData<FlyJa>> {
+    let pointer = seat.get_pointer()?;
+
+    if !pointer.has_grab(serial) {
+        return None;
+    }
+
+    let start_data = pointer.grab_start_data()?;
+    let (focus, _) = start_data.focus.as_ref()?;
+    if !focus.id().same_client_as(&surface.id()) {
+        return None;
+    }
+    Some(start_data)
+}

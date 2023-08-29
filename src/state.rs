@@ -10,12 +10,16 @@ use smithay::{
     },
     utils::{Logical, Point, Size},
     wayland::{
-        compositor::{CompositorState, CompositorClientState}, data_device::DataDeviceState, output::OutputManagerState,
-        shell::xdg::XdgShellState, shm::ShmState, socket::ListeningSocketSource,
+        compositor::{CompositorClientState, CompositorState},
+        data_device::DataDeviceState,
+        output::OutputManagerState,
+        shell::xdg::XdgShellState,
+        shm::ShmState,
+        socket::ListeningSocketSource,
     },
 };
 
-use crate::{CalloopData, shell::WindowElement};
+use crate::{shell::WindowElement, CalloopData};
 use std::sync::Arc;
 
 pub enum ResizeState {

@@ -73,6 +73,10 @@ impl WindowElement {
         self.window
             .send_frame(output, time, throttle, primary_scan_out_output)
     }
+
+    pub fn geometry(&self) -> Rectangle<i32, Logical> {
+        self.window.geometry()
+    }
 }
 
 impl IsAlive for WindowElement {
