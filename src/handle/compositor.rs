@@ -1,21 +1,17 @@
 use smithay::{
     backend::renderer::utils::on_commit_buffer_handler,
     delegate_compositor, delegate_shm,
-    desktop::Space,
-    reexports::wayland_server::{protocol::wl_surface::WlSurface, Client},
+    reexports::wayland_server::Client,
     wayland::{
         buffer::BufferHandler,
-        compositor::{
-            get_parent, is_sync_subsurface, with_states, CompositorClientState, CompositorHandler,
-        },
-        shell::xdg::XdgToplevelSurfaceData,
+        compositor::{get_parent, is_sync_subsurface, CompositorClientState, CompositorHandler},
         shm::ShmHandler,
     },
 };
 
-use crate::{shell::WindowElement, state::ClientState, FlyJa};
+use crate::{state::ClientState, FlyJa};
 
-//use super::xdg_shell;
+use super::xdg_shell;
 
 impl CompositorHandler for FlyJa {
     fn compositor_state(&mut self) -> &mut smithay::wayland::compositor::CompositorState {
@@ -45,7 +41,7 @@ impl CompositorHandler for FlyJa {
             }
         }
         // this make window can be shown
-        handle_commit(&mut self.space, surface);
+        xdg_shell::handle_commit(&mut self.space, surface);
         self.handle_resize_event();
     }
 }
@@ -64,27 +60,5 @@ impl ShmHandler for FlyJa {
     }
 }
 
-pub fn handle_commit(space: &mut Space<WindowElement>, surface: &WlSurface) -> Option<()> {
-    let window = space
-        .elements()
-        .find(|w| w.toplevel().wl_surface() == surface)
-        .cloned()?;
-
-    let initial_configure_sent = with_states(surface, |states| {
-        states
-            .data_map
-            .get::<XdgToplevelSurfaceData>()
-            .unwrap()
-            .lock()
-            .unwrap()
-            .initial_configure_sent
-    });
-
-    if !initial_configure_sent {
-        window.toplevel().send_configure();
-    }
-
-    Some(())
-}
 delegate_compositor!(FlyJa);
 delegate_shm!(FlyJa);

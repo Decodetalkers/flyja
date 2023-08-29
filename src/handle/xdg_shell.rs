@@ -1,10 +1,15 @@
 use smithay::{
     delegate_xdg_shell,
-    //input::{pointer::Focus, Seat},
-    wayland::shell::xdg::XdgShellHandler,
+    desktop::Space,
+    reexports::wayland_server::protocol::{wl_seat, wl_surface},
+    utils::Serial,
+    wayland::{
+        compositor::with_states,
+        shell::xdg::{ToplevelSurface, XdgShellHandler, XdgToplevelSurfaceData},
+    },
 };
 
-use crate::{state::ResizeState, FlyJa, shell::WindowElement};
+use crate::{shell::WindowElement, state::ResizeState, FlyJa};
 
 impl XdgShellHandler for FlyJa {
     fn grab(
@@ -35,13 +40,33 @@ impl XdgShellHandler for FlyJa {
     fn xdg_shell_state(&mut self) -> &mut smithay::wayland::shell::xdg::XdgShellState {
         &mut self.xdg_shell_state
     }
-    fn move_request(
-        &mut self,
-        _surface: smithay::wayland::shell::xdg::ToplevelSurface,
-        _seat: smithay::reexports::wayland_server::protocol::wl_seat::WlSeat,
-        _serial: smithay::utils::Serial,
-    ) {
+    fn move_request(&mut self, _surface: ToplevelSurface, _seat: wl_seat::WlSeat, _serial: Serial) {
     }
 }
 
+pub fn handle_commit(
+    space: &mut Space<WindowElement>,
+    surface: &wl_surface::WlSurface,
+) -> Option<()> {
+    let window = space
+        .elements()
+        .find(|w| w.toplevel().wl_surface() == surface)
+        .cloned()?;
+
+    let initial_configure_sent = with_states(surface, |states| {
+        states
+            .data_map
+            .get::<XdgToplevelSurfaceData>()
+            .unwrap()
+            .lock()
+            .unwrap()
+            .initial_configure_sent
+    });
+
+    if !initial_configure_sent {
+        window.toplevel().send_configure();
+    }
+
+    Some(())
+}
 delegate_xdg_shell!(FlyJa);
