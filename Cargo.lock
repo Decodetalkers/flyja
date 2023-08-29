@@ -13,9 +13,9 @@ dependencies = [
 
 [[package]]
 name = "android-activity"
-version = "0.4.2"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "40bc1575e653f158cbdc6ebcd917b9564e66321c5325c232c3591269c257be69"
+checksum = "64529721f27c2314ced0890ce45e469574a73e5e6fdd6e9da1860eb29285f5e0"
 dependencies = [
  "android-properties",
  "bitflags 1.3.2",
@@ -238,7 +238,7 @@ dependencies = [
  "bytemuck",
  "drm-ffi",
  "drm-fourcc",
- "nix 0.26.2",
+ "nix 0.26.4",
 ]
 
 [[package]]
@@ -248,7 +248,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1352481b7b90e27a8a1bf8ef6b33cf18b98dba7c410e75c24bb3eef2f0d8d525"
 dependencies = [
  "drm-sys",
- "nix 0.26.2",
+ "nix 0.26.4",
 ]
 
 [[package]]
@@ -761,16 +761,15 @@ dependencies = [
 
 [[package]]
 name = "nix"
-version = "0.26.2"
+version = "0.26.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bfdda3d196821d6af13126e40375cdf7da646a96114af134d5f417a9a1dc8e1a"
+checksum = "598beaf3cc6fdd9a5dfb1630c2800c7acd31df7aaf0f565796fba2b53ca1af1b"
 dependencies = [
  "bitflags 1.3.2",
  "cfg-if",
  "libc",
  "memoffset 0.7.1",
  "pin-utils",
- "static_assertions",
 ]
 
 [[package]]
@@ -878,9 +877,9 @@ checksum = "dd8b5dd2ae5ed71462c540258bedcb51965123ad7e7ccf4b9a8cafaa4a63576d"
 
 [[package]]
 name = "orbclient"
-version = "0.3.45"
+version = "0.3.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "221d488cd70617f1bd599ed8ceb659df2147d9393717954d82a0f5e8032a6ab1"
+checksum = "8378ac0dfbd4e7895f2d2c1f1345cab3836910baf3a300b000d04250f0c8428f"
 dependencies = [
  "redox_syscall",
 ]
@@ -1131,7 +1130,7 @@ checksum = "62bb4feee49fdd9f707ef802e22365a35de4b7b299de4763d44bfea899442ff9"
 [[package]]
 name = "smithay"
 version = "0.3.0"
-source = "git+https://github.com/Smithay/smithay#a46d24fbae89b1739cb71a32d8e70e333990ac02"
+source = "git+https://github.com/Smithay/smithay#04dea95a3202329ee4acb2ade5c9bfc47137846c"
 dependencies = [
  "appendlist",
  "ash",
@@ -1152,7 +1151,7 @@ dependencies = [
  "libc",
  "libloading 0.8.0",
  "libseat",
- "nix 0.26.2",
+ "nix 0.26.4",
  "once_cell",
  "pkg-config",
  "profiling",
@@ -1191,12 +1190,6 @@ dependencies = [
  "wayland-cursor",
  "wayland-protocols 0.29.5",
 ]
-
-[[package]]
-name = "static_assertions"
-version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
 name = "syn"
@@ -1447,7 +1440,7 @@ dependencies = [
  "cc",
  "downcast-rs",
  "io-lifetimes",
- "nix 0.26.2",
+ "nix 0.26.4",
  "scoped-tls",
  "smallvec",
  "wayland-sys 0.30.1",
@@ -1583,7 +1576,7 @@ dependencies = [
  "bitflags 1.3.2",
  "downcast-rs",
  "io-lifetimes",
- "nix 0.26.2",
+ "nix 0.26.4",
  "wayland-backend",
  "wayland-scanner 0.30.1",
 ]

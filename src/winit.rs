@@ -33,9 +33,8 @@ pub fn run_winit() -> Result<(), Box<dyn std::error::Error>> {
 
     event_loop.run(None, &mut data, move |_| {})?;
     Ok(())
-    //let mut event_loop = EventLoop::try_new().unwrap();
-    //Display::new().unwrap();
 }
+
 fn init_winit(
     event_loop: &mut EventLoop<CalloopData>,
     data: &mut CalloopData,
@@ -94,6 +93,7 @@ fn init_winit(
 
     Ok(())
 }
+
 fn winit_dispatch(
     backend: &mut WinitGraphicsBackend<GlesRenderer>,
     winit: &mut WinitEventLoop,

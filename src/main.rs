@@ -41,8 +41,8 @@ fn main() {
             println!("USAGE: flyja --backend");
             println!();
             println!("Possible backends are:");
-            for b in POSSIBLE_BACKENDS {
-                println!("\t{}", b);
+            for backend in POSSIBLE_BACKENDS {
+                println!("\t{}", backend);
             }
         }
     }

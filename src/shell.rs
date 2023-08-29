@@ -89,12 +89,15 @@ impl SpaceElement for WindowElement {
     fn geometry(&self) -> Rectangle<i32, smithay::utils::Logical> {
         SpaceElement::geometry(&self.window)
     }
+
     fn bbox(&self) -> Rectangle<i32, smithay::utils::Logical> {
         SpaceElement::bbox(&self.window)
     }
+
     fn is_in_input_region(&self, point: &Point<f64, smithay::utils::Logical>) -> bool {
         SpaceElement::is_in_input_region(&self.window, point)
     }
+
     fn z_index(&self) -> u8 {
         SpaceElement::z_index(&self.window)
     }
@@ -102,12 +105,15 @@ impl SpaceElement for WindowElement {
     fn set_activate(&self, activated: bool) {
         self.window.set_activate(activated)
     }
+
     fn output_enter(&self, output: &Output, overlap: Rectangle<i32, smithay::utils::Logical>) {
         SpaceElement::output_enter(&self.window, output, overlap)
     }
+
     fn output_leave(&self, output: &Output) {
         SpaceElement::output_leave(&self.window, output)
     }
+
     fn refresh(&self) {
         SpaceElement::refresh(&self.window)
     }
