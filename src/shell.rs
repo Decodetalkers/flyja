@@ -16,16 +16,16 @@ use smithay::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
-struct WindowInfo {
-    position: (i32, i32),
-    size: (i32, i32),
+pub struct WindowInfo {
+    pub position: (i32, i32),
+    pub size: (i32, i32),
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct WindowElement {
     window: Window,
-    tileinfo: WindowInfo,
-    normalinfo: WindowInfo,
+    pub tileinfo: WindowInfo,
+    pub normalinfo: WindowInfo,
 }
 
 impl WindowElement {

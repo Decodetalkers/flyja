@@ -5,12 +5,9 @@ use smithay::{
         pointer::{Focus, GrabStartData},
         Seat,
     },
-    reexports::{
-        wayland_protocols::xdg::shell::server::xdg_toplevel,
-        wayland_server::{
-            protocol::{wl_seat, wl_surface},
-            Resource,
-        },
+    reexports::wayland_server::{
+        protocol::{wl_seat, wl_surface},
+        Resource,
     },
     utils::Serial,
     wayland::{
@@ -67,12 +64,6 @@ impl XdgShellHandler for FlyJa {
             .clone();
 
         let initial_window_location = self.space.element_location(&window).unwrap();
-
-        surface.with_pending_state(|state| {
-            state.states.set(xdg_toplevel::State::Resizing);
-        });
-
-        surface.send_pending_configure();
 
         let grab = MoveSurfaceGrab {
             start_data,

@@ -59,7 +59,6 @@ impl PointerGrab<FlyJa> for MoveSurfaceGrab {
     ) {
         handle.button(data, event);
         const BTN_LEFT: u32 = 0x110;
-
         if !handle.current_pressed().contains(&BTN_LEFT) {
             // No more buttons are pressed, release the grab.
             handle.unset_grab(data, event.serial, event.time);
