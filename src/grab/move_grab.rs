@@ -31,6 +31,7 @@ impl PointerGrab<FlyJa> for MoveSurfaceGrab {
         data.space
             .map_element(self.window.clone(), new_location.to_i32_round(), true);
     }
+
     fn relative_motion(
         &mut self,
         data: &mut FlyJa,
@@ -40,6 +41,7 @@ impl PointerGrab<FlyJa> for MoveSurfaceGrab {
     ) {
         handle.relative_motion(data, focus, event)
     }
+
     fn axis(
         &mut self,
         data: &mut FlyJa,
@@ -48,6 +50,7 @@ impl PointerGrab<FlyJa> for MoveSurfaceGrab {
     ) {
         handle.axis(data, details)
     }
+
     fn button(
         &mut self,
         data: &mut FlyJa,
@@ -62,6 +65,7 @@ impl PointerGrab<FlyJa> for MoveSurfaceGrab {
             handle.unset_grab(data, event.serial, event.time);
         }
     }
+
     fn start_data(&self) -> &GrabStartData<FlyJa> {
         &self.start_data
     }
