@@ -1,7 +1,7 @@
 use smithay::{
     backend::renderer::utils::on_commit_buffer_handler,
     delegate_compositor, delegate_shm,
-    desktop::{Space},
+    desktop::Space,
     reexports::wayland_server::{protocol::wl_surface::WlSurface, Client},
     wayland::{
         buffer::BufferHandler,
@@ -13,7 +13,7 @@ use smithay::{
     },
 };
 
-use crate::{state::ClientState, FlyJa, shell::WindowElement};
+use crate::{shell::WindowElement, state::ClientState, FlyJa};
 
 //use super::xdg_shell;
 

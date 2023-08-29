@@ -13,8 +13,10 @@ pub struct CalloopData {
     state: FlyJa,
     display: Display<FlyJa>,
 }
+
 static POSSIBLE_BACKENDS: &[&str] =
     &["--winit : Run flyja as a X11 or Wayland client using winit."];
+
 fn main() {
     if let Ok(env_filter) = tracing_subscriber::EnvFilter::try_from_default_env() {
         tracing_subscriber::fmt()
