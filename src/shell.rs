@@ -5,7 +5,7 @@ use smithay::{
         element::{
             solid::SolidColorRenderElement, surface::WaylandSurfaceRenderElement, AsRenderElements,
         },
-        ImportAll, ImportMem, Renderer, Texture,
+        ImportAll, ImportMem, Renderer,
     },
     desktop::{space::SpaceElement, Window, WindowSurfaceType},
     output::Output,
@@ -24,7 +24,7 @@ struct WindowInfo {
 #[derive(Debug, Clone, PartialEq)]
 pub struct WindowElement {
     window: Window,
-    titleinfo: WindowInfo,
+    tileinfo: WindowInfo,
     normalinfo: WindowInfo,
 }
 
@@ -32,7 +32,7 @@ impl WindowElement {
     pub fn new(surface: ToplevelSurface) -> Self {
         WindowElement {
             window: Window::new(surface),
-            titleinfo: WindowInfo::default(),
+            tileinfo: WindowInfo::default(),
             normalinfo: WindowInfo::default(),
         }
     }
@@ -127,27 +127,20 @@ impl<R: Renderer> std::fmt::Debug for WindowRenderElement<R> {
 
 impl<R> AsRenderElements<R> for WindowElement
 where
-    R: Renderer + ImportAll + ImportMem,
-    <R as Renderer>::TextureId: Texture + 'static,
+    R: Renderer + ImportAll,
+    <R as Renderer>::TextureId: 'static,
 {
-    type RenderElement = WindowRenderElement<R>;
+    type RenderElement = WaylandSurfaceRenderElement<R>;
 
-    fn render_elements<C: From<Self::RenderElement>>(
+    #[profiling::function]
+    fn render_elements<C: From<WaylandSurfaceRenderElement<R>>>(
         &self,
         renderer: &mut R,
         location: Point<i32, Physical>,
         scale: Scale<f64>,
         alpha: f32,
     ) -> Vec<C> {
-        AsRenderElements::<R>::render_elements::<WindowRenderElement<R>>(
-            &self.window,
-            renderer,
-            location,
-            scale,
-            alpha,
-        )
-        .into_iter()
-        .map(C::from)
-        .collect()
+        self.window
+            .render_elements(renderer, location, scale, alpha)
     }
 }
