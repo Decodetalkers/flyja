@@ -17,15 +17,21 @@ use smithay::{
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct WindowInfo {
-    pub position: (i32, i32),
+    pub position: Point<f64, Logical>,
     pub size: (i32, i32),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct WindowElement {
     window: Window,
     pub tileinfo: WindowInfo,
     pub normalinfo: WindowInfo,
+}
+
+impl PartialEq for WindowElement {
+    fn eq(&self, other: &Self) -> bool {
+        self.window == other.window
+    }
 }
 
 impl WindowElement {
