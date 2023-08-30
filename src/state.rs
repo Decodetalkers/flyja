@@ -22,6 +22,15 @@ use smithay::{
 use crate::{shell::WindowElement, CalloopData};
 use std::sync::Arc;
 
+#[derive(Debug, Default)]
+pub enum WmStatus {
+    Tile,
+    TitleToStack,
+    #[default]
+    Stack,
+    StackToTitle,
+}
+
 pub enum ResizeState {
     NewTopCreated,
     ResizeFinished,
@@ -45,6 +54,7 @@ pub struct FlyJa {
     pub seat: Seat<Self>,
 
     pub reseize_state: ResizeState,
+    pub wmstatus: WmStatus,
 }
 
 impl FlyJa {
@@ -87,6 +97,7 @@ impl FlyJa {
             data_device_state,
             seat,
             reseize_state: ResizeState::ResizeFinished,
+            wmstatus: WmStatus::Stack,
         }
     }
     fn init_wayland_listener(
