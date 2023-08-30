@@ -153,6 +153,12 @@ impl FlyJa {
             self.reseize_state = ResizeState::ResizeFinished;
         }
     }
+
+    pub fn publish_commit(&self) {
+        for w in self.space.elements() {
+            w.toplevel().send_configure();
+        }
+    }
 }
 
 #[derive(Default)]

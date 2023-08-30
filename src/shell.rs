@@ -18,7 +18,6 @@ use smithay::{
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct WindowInfo {
     pub position: Point<f64, Logical>,
-    pub size: (i32, i32),
 }
 
 #[derive(Debug, Clone)]
@@ -35,11 +34,13 @@ impl PartialEq for WindowElement {
 }
 
 impl WindowElement {
-    pub fn new(surface: ToplevelSurface) -> Self {
+    pub fn new(surface: ToplevelSurface, position: Point<f64, Logical>) -> Self {
         WindowElement {
             window: Window::new(surface),
-            tileinfo: WindowInfo::default(),
-            normalinfo: WindowInfo::default(),
+            tileinfo: WindowInfo {
+                position: position.clone(),
+            },
+            normalinfo: WindowInfo { position },
         }
     }
 

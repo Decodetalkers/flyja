@@ -5,11 +5,14 @@ use smithay::{
         pointer::{Focus, GrabStartData},
         Seat,
     },
-    reexports::wayland_server::{
-        protocol::{wl_seat, wl_surface},
-        Resource,
+    reexports::{
+        wayland_protocols::xdg::shell::server::xdg_toplevel,
+        wayland_server::{
+            protocol::{wl_seat, wl_surface},
+            Resource,
+        },
     },
-    utils::Serial,
+    utils::{Point, Serial},
     wayland::{
         compositor::with_states,
         shell::xdg::{ToplevelSurface, XdgShellHandler, XdgToplevelSurfaceData},
@@ -35,7 +38,7 @@ impl XdgShellHandler for FlyJa {
         // TODO:
     }
     fn new_toplevel(&mut self, surface: smithay::wayland::shell::xdg::ToplevelSurface) {
-        let window = WindowElement::new(surface);
+        let window = WindowElement::new(surface, Point::from((0.0, 0.0)));
         self.space.map_element(window.clone(), (0, 0), false);
 
         self.reseize_state = ResizeState::NewTopCreated;
@@ -47,6 +50,15 @@ impl XdgShellHandler for FlyJa {
 
     fn xdg_shell_state(&mut self) -> &mut smithay::wayland::shell::xdg::XdgShellState {
         &mut self.xdg_shell_state
+    }
+
+    fn resize_request(
+        &mut self,
+        _surface: ToplevelSurface,
+        _seat: wl_seat::WlSeat,
+        _serial: Serial,
+        _edges: xdg_toplevel::ResizeEdge,
+    ) {
     }
 
     fn move_request(&mut self, surface: ToplevelSurface, seat: wl_seat::WlSeat, serial: Serial) {
@@ -83,7 +95,6 @@ pub fn handle_commit(
         .elements()
         .find(|w| w.toplevel().wl_surface() == surface)
         .cloned()?;
-
     let initial_configure_sent = with_states(surface, |states| {
         states
             .data_map
