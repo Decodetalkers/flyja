@@ -31,6 +31,21 @@ pub enum WmStatus {
     StackToTitle,
 }
 
+impl WmStatus {
+    pub fn status_change(&mut self) {
+        match self {
+            WmStatus::Tile => *self = WmStatus::TitleToStack,
+            WmStatus::TitleToStack => *self = WmStatus::Stack,
+            WmStatus::Stack => *self = WmStatus::StackToTitle,
+            WmStatus::StackToTitle => *self = WmStatus::Tile,
+        }
+    }
+
+    pub fn is_changing(&self) -> bool {
+        matches!(self, WmStatus::StackToTitle | WmStatus::TitleToStack)
+    }
+}
+
 pub enum ResizeState {
     NewTopCreated,
     ResizeFinished,
@@ -163,6 +178,14 @@ impl FlyJa {
             }
             self.reseize_state = ResizeState::ResizeFinished;
         }
+    }
+
+    pub fn handle_state_change_event(&mut self) {
+        if !self.wmstatus.is_changing() {
+            return;
+        }
+        self.wmstatus.status_change();
+        // TODO: handle state change
     }
 
     pub fn publish_commit(&self) {

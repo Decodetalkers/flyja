@@ -44,6 +44,7 @@ impl CompositorHandler for FlyJa {
         xdg_shell::handle_commit(&mut self.space, surface);
 
         self.handle_resize_event();
+        self.handle_state_change_event();
     }
 }
 

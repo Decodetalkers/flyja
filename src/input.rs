@@ -23,6 +23,7 @@ enum KeyAction {
     VtSwitch(i32),
     /// run a command
     Run(String),
+    ChangeWmState,
     /// Switch the current screen
     Screen(usize),
     ScaleUp,
@@ -42,8 +43,8 @@ impl FlyJa {
         _output_name: &str,
     ) {
         match event {
-            InputEvent::Keyboard { event } => {
-                if let KeyAction::Run(cmd) = self.keyboard_key_to_action::<I>(event) {
+            InputEvent::Keyboard { event } => match self.keyboard_key_to_action::<I>(event) {
+                KeyAction::Run(cmd) => {
                     if let Err(e) = std::process::Command::new(&cmd)
                         .env("WAYLAND_DISPLAY", self.socket_name.clone())
                         .spawn()
@@ -51,7 +52,15 @@ impl FlyJa {
                         tracing::error!(cmd, err = %e, "Failed to start program");
                     }
                 }
-            }
+                KeyAction::ChangeWmState => {
+                    if !self.wmstatus.is_changing() {
+                        println!("ssss");
+                        self.wmstatus.status_change();
+                        self.publish_commit();
+                    }
+                }
+                _ => {}
+            },
             // Mouse or touch pad
             InputEvent::PointerButton { event } => {
                 let pointer = self.seat.get_pointer().unwrap();
@@ -207,6 +216,8 @@ fn process_keyboard_shortcut(modifiers: ModifiersState, keysym: Keysym) -> Optio
         Some(KeyAction::Screen((keysym - xkb::KEY_1) as usize))
     } else if modifiers.logo && modifiers.shift && keysym == xkb::KEY_M {
         Some(KeyAction::ScaleDown)
+    } else if modifiers.logo && keysym == xkb::KEY_P {
+        Some(KeyAction::ChangeWmState)
     } else if modifiers.logo && modifiers.shift && keysym == xkb::KEY_P {
         Some(KeyAction::ScaleUp)
     } else if modifiers.logo && modifiers.shift && keysym == xkb::KEY_W {
