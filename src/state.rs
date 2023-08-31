@@ -1,4 +1,4 @@
-use std::{ffi::OsString, os::unix::io::AsRawFd};
+use std::{ffi::OsString, os::unix::io::AsRawFd, sync::Arc};
 
 use smithay::{
     desktop::{Space, WindowSurfaceType},
@@ -6,7 +6,8 @@ use smithay::{
     input::{pointer::PointerHandle, SeatState},
     reexports::{
         calloop::{generic::Generic, EventLoop, Interest, LoopSignal, Mode, PostAction},
-        wayland_server::{backend::ClientData, protocol::wl_surface::WlSurface, Display}, wayland_protocols::xdg::shell::server::xdg_toplevel,
+        wayland_protocols::xdg::shell::server::xdg_toplevel,
+        wayland_server::{backend::ClientData, protocol::wl_surface::WlSurface, Display},
     },
     utils::{Logical, Point, Size},
     wayland::{
@@ -20,29 +21,37 @@ use smithay::{
 };
 
 use crate::{shell::WindowElement, CalloopData};
-use std::sync::Arc;
 
 #[derive(Debug, Default)]
 pub enum WmStatus {
     Tile,
-    TitleToStack,
+    TitleToStack(usize),
     #[default]
     Stack,
-    StackToTitle,
+    StackToTitle(usize),
 }
 
 impl WmStatus {
-    pub fn status_change(&mut self) {
+    pub fn status_change(&mut self, elementcount: usize) {
         match self {
-            WmStatus::Tile => *self = WmStatus::TitleToStack,
-            WmStatus::TitleToStack => *self = WmStatus::Stack,
-            WmStatus::Stack => *self = WmStatus::StackToTitle,
-            WmStatus::StackToTitle => *self = WmStatus::Tile,
+            WmStatus::Tile => *self = WmStatus::TitleToStack(elementcount),
+            WmStatus::Stack => *self = WmStatus::StackToTitle(elementcount),
+            _ => {}
+        }
+    }
+
+    pub fn status_to_final_state(&mut self) {
+        match self {
+            WmStatus::TitleToStack(1) => *self = WmStatus::Stack,
+            WmStatus::TitleToStack(length) => *self = WmStatus::TitleToStack(*length - 1),
+            WmStatus::StackToTitle(1) => *self = WmStatus::Tile,
+            WmStatus::StackToTitle(length) => *self = WmStatus::StackToTitle(*length - 1),
+            _ => {}
         }
     }
 
     pub fn is_changing(&self) -> bool {
-        matches!(self, WmStatus::StackToTitle | WmStatus::TitleToStack)
+        matches!(self, WmStatus::StackToTitle(_) | WmStatus::TitleToStack(_))
     }
 }
 
@@ -110,6 +119,11 @@ impl FlyJa {
             wmstatus: WmStatus::Stack,
         }
     }
+
+    pub fn get_element_count(&self) -> usize {
+        self.space.elements().count()
+    }
+
     fn init_wayland_listener(
         display: &mut Display<FlyJa>,
         event_loop: &mut EventLoop<CalloopData>,
@@ -186,7 +200,9 @@ impl FlyJa {
         if !self.wmstatus.is_changing() {
             return;
         }
-        self.wmstatus.status_change();
+
+        self.wmstatus.status_to_final_state();
+
         let Some(window) = self
             .space
             .elements()
@@ -195,7 +211,8 @@ impl FlyJa {
         else {
             return;
         };
-        self.space.map_element(window, (0, 0), false);
+
+        self.space.map_element(window, (0, 0), true);
     }
 
     pub fn publish_commit(&self) {
@@ -209,6 +226,7 @@ impl FlyJa {
 pub struct ClientState {
     pub compositor_state: CompositorClientState,
 }
+
 impl ClientData for ClientState {
     fn initialized(&self, _client_id: smithay::reexports::wayland_server::backend::ClientId) {}
     fn disconnected(
