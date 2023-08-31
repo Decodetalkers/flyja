@@ -46,6 +46,7 @@ impl WmStatus {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum ResizeState {
     NewTopCreated,
     ResizeFinished,
@@ -166,18 +167,24 @@ impl FlyJa {
             })
     }
 
-    pub fn handle_resize_event(&mut self) {
-        if let ResizeState::NewTopCreated = self.reseize_state {
-            for window in self.space.elements() {
-                let surface = window.toplevel();
-                surface.with_pending_state(|state| {
-                    let size = Size::from((1000, 1000));
-                    state.size = Some(size);
-                });
-                surface.send_configure();
-            }
-            self.reseize_state = ResizeState::ResizeFinished;
+    pub fn handle_resize_event(&mut self, surface: &WlSurface) {
+        if ResizeState::NewTopCreated != self.reseize_state {
+            return;
         }
+        let Some(window) = self
+            .space
+            .elements()
+            .find(|w| w.toplevel().wl_surface() == surface)
+        else {
+            return;
+        };
+        let surface = window.toplevel();
+        surface.with_pending_state(|state| {
+            let size = Size::from((1000, 1000));
+            state.size = Some(size);
+        });
+        surface.send_configure();
+        self.reseize_state = ResizeState::ResizeFinished;
     }
 
     pub fn handle_state_change_event(&mut self) {
