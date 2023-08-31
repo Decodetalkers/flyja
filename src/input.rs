@@ -54,7 +54,6 @@ impl FlyJa {
                 }
                 KeyAction::ChangeWmState => {
                     if !self.wmstatus.is_changing() {
-                        println!("ssss");
                         self.wmstatus.status_change();
                         self.publish_commit();
                     }

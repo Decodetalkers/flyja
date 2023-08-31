@@ -6,7 +6,7 @@ use smithay::{
     input::{pointer::PointerHandle, SeatState},
     reexports::{
         calloop::{generic::Generic, EventLoop, Interest, LoopSignal, Mode, PostAction},
-        wayland_server::{backend::ClientData, protocol::wl_surface::WlSurface, Display},
+        wayland_server::{backend::ClientData, protocol::wl_surface::WlSurface, Display}, wayland_protocols::xdg::shell::server::xdg_toplevel,
     },
     utils::{Logical, Point, Size},
     wayland::{
@@ -46,12 +46,6 @@ impl WmStatus {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum ResizeState {
-    NewTopCreated,
-    ResizeFinished,
-}
-
 pub struct FlyJa {
     pub start_time: std::time::Instant,
     pub socket_name: OsString,
@@ -69,7 +63,7 @@ pub struct FlyJa {
 
     pub seat: Seat<Self>,
 
-    pub reseize_state: ResizeState,
+    pub reseize_state: Option<WlSurface>,
     pub wmstatus: WmStatus,
 }
 
@@ -112,7 +106,7 @@ impl FlyJa {
             seat_state,
             data_device_state,
             seat,
-            reseize_state: ResizeState::ResizeFinished,
+            reseize_state: None,
             wmstatus: WmStatus::Stack,
         }
     }
@@ -167,10 +161,10 @@ impl FlyJa {
             })
     }
 
-    pub fn handle_resize_event(&mut self, surface: &WlSurface) {
-        if ResizeState::NewTopCreated != self.reseize_state {
+    pub fn handle_resize_event(&mut self) {
+        let Some(ref surface) = self.reseize_state else {
             return;
-        }
+        };
         let Some(window) = self
             .space
             .elements()
@@ -180,24 +174,33 @@ impl FlyJa {
         };
         let surface = window.toplevel();
         surface.with_pending_state(|state| {
+            state.states.set(xdg_toplevel::State::Resizing);
             let size = Size::from((1000, 1000));
             state.size = Some(size);
         });
         surface.send_configure();
-        self.reseize_state = ResizeState::ResizeFinished;
+        self.reseize_state = None;
     }
 
-    pub fn handle_state_change_event(&mut self) {
+    pub fn handle_state_change_event(&mut self, surface: &WlSurface) {
         if !self.wmstatus.is_changing() {
             return;
         }
         self.wmstatus.status_change();
-        // TODO: handle state change
+        let Some(window) = self
+            .space
+            .elements()
+            .find(|w| w.toplevel().wl_surface() == surface)
+            .cloned()
+        else {
+            return;
+        };
+        self.space.map_element(window, (0, 0), false);
     }
 
     pub fn publish_commit(&self) {
         for w in self.space.elements() {
-            w.toplevel().send_configure();
+            w.toplevel().send_pending_configure();
         }
     }
 }

@@ -19,7 +19,7 @@ use smithay::{
     },
 };
 
-use crate::{grab::move_grab::MoveSurfaceGrab, shell::WindowElement, state::ResizeState, FlyJa};
+use crate::{grab::move_grab::MoveSurfaceGrab, shell::WindowElement, FlyJa};
 
 impl XdgShellHandler for FlyJa {
     fn grab(
@@ -41,7 +41,7 @@ impl XdgShellHandler for FlyJa {
         let window = WindowElement::new(surface, Point::from((0.0, 0.0)));
         self.space.map_element(window.clone(), (0, 0), false);
 
-        self.reseize_state = ResizeState::NewTopCreated;
+        self.reseize_state = None;
     }
 
     fn toplevel_destroyed(&mut self, _surface: smithay::wayland::shell::xdg::ToplevelSurface) {

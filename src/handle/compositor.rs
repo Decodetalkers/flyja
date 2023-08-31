@@ -4,7 +4,10 @@ use smithay::{
     reexports::wayland_server::Client,
     wayland::{
         buffer::BufferHandler,
-        compositor::{get_parent, is_sync_subsurface, CompositorClientState, CompositorHandler},
+        compositor::{
+            get_parent, is_sync_subsurface, CompositorClientState, CompositorHandler,
+            CompositorState,
+        },
         shm::ShmHandler,
     },
 };
@@ -14,7 +17,7 @@ use crate::{state::ClientState, FlyJa};
 use super::xdg_shell;
 
 impl CompositorHandler for FlyJa {
-    fn compositor_state(&mut self) -> &mut smithay::wayland::compositor::CompositorState {
+    fn compositor_state(&mut self) -> &mut CompositorState {
         &mut self.compositor_state
     }
 
@@ -40,11 +43,13 @@ impl CompositorHandler for FlyJa {
                 window.on_commit();
             }
         }
-        // this make window can be shown
         xdg_shell::handle_commit(&mut self.space, surface);
+        self.handle_state_change_event(surface);
 
-        self.handle_resize_event(surface);
-        self.handle_state_change_event();
+        self.handle_resize_event();
+        self.reseize_state = Some(surface.clone());
+        // this make window can be shown
+
     }
 }
 
