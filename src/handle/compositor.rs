@@ -1,7 +1,7 @@
 use smithay::{
     backend::renderer::utils::on_commit_buffer_handler,
     delegate_compositor, delegate_shm,
-    reexports::wayland_server::Client,
+    reexports::wayland_server::{protocol::wl_surface::WlSurface, Client},
     wayland::{
         buffer::BufferHandler,
         compositor::{
@@ -25,10 +25,7 @@ impl CompositorHandler for FlyJa {
         &client.get_data::<ClientState>().unwrap().compositor_state
     }
 
-    fn commit(
-        &mut self,
-        surface: &smithay::reexports::wayland_server::protocol::wl_surface::WlSurface,
-    ) {
+    fn commit(&mut self, surface: &WlSurface) {
         on_commit_buffer_handler::<Self>(surface);
         if !is_sync_subsurface(surface) {
             let mut root = surface.clone();
@@ -43,13 +40,14 @@ impl CompositorHandler for FlyJa {
                 window.on_commit();
             }
         }
+
         xdg_shell::handle_commit(&mut self.space, surface);
+
         self.handle_state_change_event(surface);
 
         self.handle_resize_event();
-        self.reseize_state = Some(surface.clone());
-        // this make window can be shown
 
+        self.reseize_state = Some(surface.clone());
     }
 }
 
