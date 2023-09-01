@@ -35,6 +35,7 @@ pub enum WmStatus {
 pub enum PeddingResize {
     ReadyToResize,
     Resizing(WlSurface),
+    ResizeFinished(WlSurface),
     #[default]
     Stop,
 }
@@ -185,12 +186,30 @@ impl FlyJa {
         else {
             return;
         };
-        println!("ffffffff");
-        let surface = window.toplevel();
-        surface.with_pending_state(|state| {
+        let surface_top = window.toplevel();
+        surface_top.with_pending_state(|state| {
             state.states.set(xdg_toplevel::State::Resizing);
             let size = Size::from((1000, 1000));
             state.size = Some(size);
+        });
+        surface_top.send_configure();
+        self.reseize_state = PeddingResize::ResizeFinished(surface.clone());
+    }
+
+    pub fn handle_resize_event_finished(&mut self) {
+        let PeddingResize::ResizeFinished(ref surface) = self.reseize_state else {
+            return;
+        };
+        let Some(window) = self
+            .space
+            .elements()
+            .find(|w| w.toplevel().wl_surface() == surface)
+        else {
+            return;
+        };
+        let surface = window.toplevel();
+        surface.with_pending_state(|state| {
+            state.states.unset(xdg_toplevel::State::Resizing);
         });
         surface.send_configure();
         self.reseize_state = PeddingResize::Stop;

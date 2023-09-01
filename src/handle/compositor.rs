@@ -49,6 +49,7 @@ impl CompositorHandler for FlyJa {
         self.handle_state_change_event();
 
         self.handle_resize_event();
+        self.handle_resize_event_finished();
 
         if let PeddingResize::ReadyToResize = self.reseize_state {
             self.reseize_state = PeddingResize::Resizing(surface.clone());
