@@ -31,6 +31,15 @@ pub enum WmStatus {
     StackToTite,
 }
 
+#[derive(Debug, Default)]
+pub enum PeddingResize {
+    ReadyToResize,
+    Resizing(WlSurface),
+    #[default]
+    Stop,
+}
+
+
 impl WmStatus {
     pub fn status_change(&mut self) {
         match self {
@@ -62,7 +71,7 @@ pub struct FlyJa {
 
     pub seat: Seat<Self>,
 
-    pub reseize_state: Option<WlSurface>,
+    pub reseize_state: PeddingResize,
     pub wmstatus: WmStatus,
 }
 
@@ -105,7 +114,7 @@ impl FlyJa {
             seat_state,
             data_device_state,
             seat,
-            reseize_state: None,
+            reseize_state: PeddingResize::Stop,
             wmstatus: WmStatus::Stack,
         }
     }
@@ -166,7 +175,7 @@ impl FlyJa {
     }
 
     pub fn handle_resize_event(&mut self) {
-        let Some(ref surface) = self.reseize_state else {
+        let PeddingResize::Resizing(ref surface) = self.reseize_state else {
             return;
         };
         let Some(window) = self
@@ -176,6 +185,7 @@ impl FlyJa {
         else {
             return;
         };
+        println!("ffffffff");
         let surface = window.toplevel();
         surface.with_pending_state(|state| {
             state.states.set(xdg_toplevel::State::Resizing);
@@ -183,7 +193,7 @@ impl FlyJa {
             state.size = Some(size);
         });
         surface.send_configure();
-        self.reseize_state = None;
+        self.reseize_state = PeddingResize::Stop;
     }
 
     pub fn handle_state_change_event(&mut self) {

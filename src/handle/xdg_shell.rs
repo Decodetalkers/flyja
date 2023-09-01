@@ -15,11 +15,11 @@ use smithay::{
     utils::{Point, Serial},
     wayland::{
         compositor::with_states,
-        shell::xdg::{ToplevelSurface, XdgShellHandler, XdgToplevelSurfaceData},
+        shell::xdg::{Configure, ToplevelSurface, XdgShellHandler, XdgToplevelSurfaceData},
     },
 };
 
-use crate::{grab::move_grab::MoveSurfaceGrab, shell::WindowElement, FlyJa};
+use crate::{grab::move_grab::MoveSurfaceGrab, shell::WindowElement, FlyJa, state::PeddingResize};
 
 impl XdgShellHandler for FlyJa {
     fn grab(
@@ -41,7 +41,7 @@ impl XdgShellHandler for FlyJa {
         let window = WindowElement::new(surface, Point::from((0.0, 0.0)));
         self.space.map_element(window.clone(), (0, 0), false);
 
-        self.reseize_state = None;
+        self.reseize_state = PeddingResize::ReadyToResize;
     }
 
     fn toplevel_destroyed(&mut self, _surface: smithay::wayland::shell::xdg::ToplevelSurface) {
@@ -59,6 +59,7 @@ impl XdgShellHandler for FlyJa {
         _serial: Serial,
         _edges: xdg_toplevel::ResizeEdge,
     ) {
+        println!("ffffffff");
     }
 
     fn move_request(&mut self, surface: ToplevelSurface, seat: wl_seat::WlSeat, serial: Serial) {
@@ -84,6 +85,12 @@ impl XdgShellHandler for FlyJa {
         };
 
         pointer.set_grab(self, grab, serial, Focus::Clear);
+    }
+
+    fn ack_configure(&mut self, _surface: wl_surface::WlSurface, configure: Configure) {
+        if let Configure::Toplevel(configure) = configure {
+            println!("{:?}", configure.state);
+        }
     }
 }
 

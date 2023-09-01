@@ -12,7 +12,10 @@ use smithay::{
     },
 };
 
-use crate::{state::ClientState, FlyJa};
+use crate::{
+    state::{ClientState, PeddingResize},
+    FlyJa,
+};
 
 use super::xdg_shell;
 
@@ -47,7 +50,9 @@ impl CompositorHandler for FlyJa {
 
         self.handle_resize_event();
 
-        self.reseize_state = Some(surface.clone());
+        if let PeddingResize::ReadyToResize = self.reseize_state {
+            self.reseize_state = PeddingResize::Resizing(surface.clone());
+        }
     }
 }
 
