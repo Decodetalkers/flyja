@@ -37,9 +37,7 @@ impl WindowElement {
     pub fn new(surface: ToplevelSurface, position: Point<f64, Logical>) -> Self {
         WindowElement {
             window: Window::new(surface),
-            tileinfo: WindowInfo {
-                position: position.clone(),
-            },
+            tileinfo: WindowInfo { position },
             normalinfo: WindowInfo { position },
         }
     }

@@ -25,33 +25,23 @@ use crate::{shell::WindowElement, CalloopData};
 #[derive(Debug, Default)]
 pub enum WmStatus {
     Tile,
-    TitleToStack(usize),
+    TiteToStack,
     #[default]
     Stack,
-    StackToTitle(usize),
+    StackToTite,
 }
 
 impl WmStatus {
-    pub fn status_change(&mut self, elementcount: usize) {
+    pub fn status_change(&mut self) {
         match self {
-            WmStatus::Tile => *self = WmStatus::TitleToStack(elementcount),
-            WmStatus::Stack => *self = WmStatus::StackToTitle(elementcount),
-            _ => {}
+            WmStatus::Tile => *self = WmStatus::TiteToStack,
+            WmStatus::TiteToStack => *self = WmStatus::Stack,
+            WmStatus::Stack => *self = WmStatus::StackToTite,
+            WmStatus::StackToTite => *self = WmStatus::Tile,
         }
     }
-
-    pub fn status_to_final_state(&mut self) {
-        match self {
-            WmStatus::TitleToStack(1) => *self = WmStatus::Stack,
-            WmStatus::TitleToStack(length) => *self = WmStatus::TitleToStack(*length - 1),
-            WmStatus::StackToTitle(1) => *self = WmStatus::Tile,
-            WmStatus::StackToTitle(length) => *self = WmStatus::StackToTitle(*length - 1),
-            _ => {}
-        }
-    }
-
     pub fn is_changing(&self) -> bool {
-        matches!(self, WmStatus::StackToTitle(_) | WmStatus::TitleToStack(_))
+        matches!(self, WmStatus::StackToTite | WmStatus::TiteToStack)
     }
 }
 
@@ -196,29 +186,23 @@ impl FlyJa {
         self.reseize_state = None;
     }
 
-    pub fn handle_state_change_event(&mut self, surface: &WlSurface) {
+    pub fn handle_state_change_event(&mut self) {
         if !self.wmstatus.is_changing() {
             return;
         }
 
-        self.wmstatus.status_to_final_state();
-
-        let Some(window) = self
-            .space
-            .elements()
-            .find(|w| w.toplevel().wl_surface() == surface)
-            .cloned()
-        else {
-            return;
-        };
-
-        self.space.map_element(window, (0, 0), true);
+        self.wmstatus.status_change();
+        let elements: Vec<_> = self.space.elements().cloned().collect();
+        for element in elements {
+            self.space.map_element(element, (0, 0), false);
+        }
     }
 
     pub fn publish_commit(&self) {
-        for w in self.space.elements() {
-            w.toplevel().send_pending_configure();
-        }
+        let Some(window) = self.space.elements().next() else {
+            return;
+        };
+        window.toplevel().send_pending_configure();
     }
 }
 
