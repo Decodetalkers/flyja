@@ -1,4 +1,4 @@
-use crate::FlyJa;
+use crate::{state::Backend, FlyJa};
 
 use crate::shell::WindowElement;
 
@@ -9,17 +9,17 @@ use smithay::{
 };
 
 #[derive(Debug)]
-pub struct MoveSurfaceGrab {
-    pub start_data: GrabStartData<FlyJa>,
+pub struct MoveSurfaceGrab<BackendData: Backend + 'static> {
+    pub start_data: GrabStartData<FlyJa<BackendData>>,
     pub window: WindowElement,
     pub initial_window_location: Point<i32, Logical>,
 }
 
-impl PointerGrab<FlyJa> for MoveSurfaceGrab {
+impl<BackendData: Backend> PointerGrab<FlyJa<BackendData>> for MoveSurfaceGrab<BackendData> {
     fn motion(
         &mut self,
-        data: &mut FlyJa,
-        handle: &mut PointerInnerHandle<'_, FlyJa>,
+        data: &mut FlyJa<BackendData>,
+        handle: &mut PointerInnerHandle<'_, FlyJa<BackendData>>,
         _focus: Option<(WlSurface, Point<i32, Logical>)>,
         event: &smithay::input::pointer::MotionEvent,
     ) {
@@ -35,8 +35,8 @@ impl PointerGrab<FlyJa> for MoveSurfaceGrab {
 
     fn relative_motion(
         &mut self,
-        data: &mut FlyJa,
-        handle: &mut PointerInnerHandle<'_, FlyJa>,
+        data: &mut FlyJa<BackendData>,
+        handle: &mut PointerInnerHandle<'_, FlyJa<BackendData>>,
         focus: Option<(WlSurface, Point<i32, Logical>)>,
         event: &smithay::input::pointer::RelativeMotionEvent,
     ) {
@@ -45,8 +45,8 @@ impl PointerGrab<FlyJa> for MoveSurfaceGrab {
 
     fn axis(
         &mut self,
-        data: &mut FlyJa,
-        handle: &mut PointerInnerHandle<'_, FlyJa>,
+        data: &mut FlyJa<BackendData>,
+        handle: &mut PointerInnerHandle<'_, FlyJa<BackendData>>,
         details: smithay::input::pointer::AxisFrame,
     ) {
         handle.axis(data, details)
@@ -54,8 +54,8 @@ impl PointerGrab<FlyJa> for MoveSurfaceGrab {
 
     fn button(
         &mut self,
-        data: &mut FlyJa,
-        handle: &mut PointerInnerHandle<'_, FlyJa>,
+        data: &mut FlyJa<BackendData>,
+        handle: &mut PointerInnerHandle<'_, FlyJa<BackendData>>,
         event: &smithay::input::pointer::ButtonEvent,
     ) {
         handle.button(data, event);
@@ -66,7 +66,7 @@ impl PointerGrab<FlyJa> for MoveSurfaceGrab {
         }
     }
 
-    fn start_data(&self) -> &GrabStartData<FlyJa> {
+    fn start_data(&self) -> &GrabStartData<FlyJa<BackendData>> {
         &self.start_data
     }
 }

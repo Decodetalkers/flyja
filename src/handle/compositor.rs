@@ -13,13 +13,13 @@ use smithay::{
 };
 
 use crate::{
-    state::{ClientState, PeddingResize},
+    state::{Backend, ClientState, PeddingResize},
     FlyJa,
 };
 
 use super::xdg_shell;
 
-impl CompositorHandler for FlyJa {
+impl<BackendData: Backend> CompositorHandler for FlyJa<BackendData> {
     fn compositor_state(&mut self) -> &mut CompositorState {
         &mut self.compositor_state
     }
@@ -57,7 +57,7 @@ impl CompositorHandler for FlyJa {
     }
 }
 
-impl BufferHandler for FlyJa {
+impl<BackendData: Backend> BufferHandler for FlyJa<BackendData> {
     fn buffer_destroyed(
         &mut self,
         _buffer: &smithay::reexports::wayland_server::protocol::wl_buffer::WlBuffer,
@@ -65,11 +65,11 @@ impl BufferHandler for FlyJa {
     }
 }
 
-impl ShmHandler for FlyJa {
+impl<BackendData: Backend> ShmHandler for FlyJa<BackendData> {
     fn shm_state(&self) -> &smithay::wayland::shm::ShmState {
         &self.shm_state
     }
 }
 
-delegate_compositor!(FlyJa);
-delegate_shm!(FlyJa);
+delegate_compositor!(@<BackendData: Backend + 'static> FlyJa<BackendData>);
+delegate_shm!(@<BackendData: Backend + 'static> FlyJa<BackendData>);

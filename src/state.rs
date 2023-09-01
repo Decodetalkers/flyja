@@ -20,6 +20,11 @@ use smithay::{
     },
 };
 
+pub trait Backend {
+    const HAS_RELATIVE_MOTION: bool = false;
+    fn seat_name(&self) -> String;
+}
+
 use crate::{shell::WindowElement, CalloopData};
 
 #[derive(Debug, Default)]
@@ -40,7 +45,6 @@ pub enum PeddingResize {
     Stop,
 }
 
-
 impl WmStatus {
     pub fn status_change(&mut self) {
         match self {
@@ -55,7 +59,8 @@ impl WmStatus {
     }
 }
 
-pub struct FlyJa {
+pub struct FlyJa<BackendData: Backend + 'static> {
+    pub backend_data: BackendData,
     pub start_time: std::time::Instant,
     pub socket_name: OsString,
 
@@ -67,7 +72,7 @@ pub struct FlyJa {
     pub xdg_shell_state: XdgShellState,
     pub shm_state: ShmState,
     pub output_manager_state: OutputManagerState,
-    pub seat_state: SeatState<FlyJa>,
+    pub seat_state: SeatState<FlyJa<BackendData>>,
     pub data_device_state: DataDeviceState,
 
     pub seat: Seat<Self>,
@@ -76,8 +81,12 @@ pub struct FlyJa {
     pub wmstatus: WmStatus,
 }
 
-impl FlyJa {
-    pub fn new(event_loop: &mut EventLoop<CalloopData>, display: &mut Display<FlyJa>) -> Self {
+impl<BackendData: Backend + 'static> FlyJa<BackendData> {
+    pub fn new(
+        backend_data: BackendData,
+        event_loop: &mut EventLoop<CalloopData<BackendData>>,
+        display: &mut Display<FlyJa<BackendData>>,
+    ) -> Self {
         let start_time = std::time::Instant::now();
 
         let dh = display.handle();
@@ -102,6 +111,7 @@ impl FlyJa {
         let loop_signal = event_loop.get_signal();
 
         Self {
+            backend_data,
             start_time,
 
             space,
@@ -124,10 +134,13 @@ impl FlyJa {
         self.space.elements().count()
     }
 
-    fn init_wayland_listener(
-        display: &mut Display<FlyJa>,
-        event_loop: &mut EventLoop<CalloopData>,
-    ) -> OsString {
+    fn init_wayland_listener<T>(
+        display: &mut Display<FlyJa<BackendData>>,
+        event_loop: &mut EventLoop<CalloopData<T>>,
+    ) -> OsString
+    where
+        T: Backend + 'static,
+    {
         let listening_socket = ListeningSocketSource::new_auto().unwrap();
 
         let socket_name = listening_socket.socket_name().to_os_string();

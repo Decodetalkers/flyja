@@ -19,9 +19,14 @@ use smithay::{
     },
 };
 
-use crate::{grab::move_grab::MoveSurfaceGrab, shell::WindowElement, FlyJa, state::PeddingResize};
+use crate::{
+    grab::move_grab::MoveSurfaceGrab,
+    shell::WindowElement,
+    state::{Backend, PeddingResize},
+    FlyJa,
+};
 
-impl XdgShellHandler for FlyJa {
+impl<BackendData: Backend> XdgShellHandler for FlyJa<BackendData> {
     fn grab(
         &mut self,
         _surface: smithay::wayland::shell::xdg::PopupSurface,
@@ -59,11 +64,10 @@ impl XdgShellHandler for FlyJa {
         _serial: Serial,
         _edges: xdg_toplevel::ResizeEdge,
     ) {
-        println!("ffffffff");
     }
 
     fn move_request(&mut self, surface: ToplevelSurface, seat: wl_seat::WlSeat, serial: Serial) {
-        let seat: Seat<FlyJa> = Seat::from_resource(&seat).unwrap();
+        let seat: Seat<FlyJa<BackendData>> = Seat::from_resource(&seat).unwrap();
         let wl_surface = surface.wl_surface();
         let Some(start_data) = check_grab(&seat, wl_surface, serial) else {
             return;
@@ -118,13 +122,16 @@ pub fn handle_commit(
 
     Some(())
 }
-delegate_xdg_shell!(FlyJa);
+delegate_xdg_shell!(@<BackendData: Backend + 'static> FlyJa<BackendData>);
 
-fn check_grab(
-    seat: &Seat<FlyJa>,
+fn check_grab<T>(
+    seat: &Seat<FlyJa<T>>,
     surface: &wl_surface::WlSurface,
     serial: Serial,
-) -> Option<GrabStartData<FlyJa>> {
+) -> Option<GrabStartData<FlyJa<T>>>
+where
+    T: Backend,
+{
     let pointer = seat.get_pointer()?;
 
     if !pointer.has_grab(serial) {

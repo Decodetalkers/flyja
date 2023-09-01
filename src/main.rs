@@ -11,9 +11,11 @@ use smithay::reexports::wayland_server::Display;
 
 use crate::winit::run_winit;
 
-pub struct CalloopData {
-    state: FlyJa,
-    display: Display<FlyJa>,
+use state::Backend;
+
+pub struct CalloopData<BackendData: Backend + 'static> {
+    state: FlyJa<BackendData>,
+    display: Display<FlyJa<BackendData>>,
 }
 
 static POSSIBLE_BACKENDS: &[&str] =

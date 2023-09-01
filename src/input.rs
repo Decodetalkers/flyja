@@ -11,7 +11,7 @@ use smithay::{
     utils::SERIAL_COUNTER,
 };
 
-use crate::FlyJa;
+use crate::{state::Backend, FlyJa};
 
 /// Possible results of a keyboard action
 #[allow(dead_code)]
@@ -35,7 +35,7 @@ enum KeyAction {
     None,
 }
 
-impl FlyJa {
+impl<BackendData: Backend + 'static> FlyJa<BackendData> {
     pub fn process_input_event<I: InputBackend>(
         &mut self,
         _dh: &DisplayHandle,
@@ -166,7 +166,7 @@ impl FlyJa {
     }
 }
 
-impl FlyJa {
+impl<BackendData: Backend + 'static> FlyJa<BackendData> {
     fn keyboard_key_to_action<B: InputBackend>(&mut self, evt: B::KeyboardKeyEvent) -> KeyAction {
         let keycode = evt.key_code();
         let state = evt.state();

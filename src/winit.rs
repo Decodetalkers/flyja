@@ -1,3 +1,4 @@
+use crate::state::Backend;
 use crate::CalloopData;
 use crate::FlyJa;
 use smithay::{
@@ -22,11 +23,20 @@ use std::time::Duration;
 
 pub const OUTPUT_NAME: &str = "winit";
 
-pub fn run_winit() -> Result<(), Box<dyn std::error::Error>> {
-    let mut event_loop: EventLoop<CalloopData> = EventLoop::try_new()?;
+pub struct WinitData;
 
-    let mut display: Display<FlyJa> = Display::new()?;
-    let state = FlyJa::new(&mut event_loop, &mut display);
+impl Backend for WinitData {
+    fn seat_name(&self) -> String {
+        "Winit".to_string()
+    }
+}
+
+pub fn run_winit() -> Result<(), Box<dyn std::error::Error>> {
+    let mut event_loop: EventLoop<CalloopData<WinitData>> = EventLoop::try_new()?;
+
+    let mut display: Display<FlyJa<WinitData>> = Display::new()?;
+    let data = WinitData;
+    let state = FlyJa::new(data, &mut event_loop, &mut display);
 
     let mut data = CalloopData { state, display };
     init_winit(&mut event_loop, &mut data)?;
@@ -35,12 +45,16 @@ pub fn run_winit() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn init_winit(
-    event_loop: &mut EventLoop<CalloopData>,
-    data: &mut CalloopData,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn init_winit<T>(
+    event_loop: &mut EventLoop<CalloopData<T>>,
+    data: &mut CalloopData<T>,
+) -> Result<(), Box<dyn std::error::Error>>
+where
+    T: Backend + 'static,
+{
     let display = &mut data.display;
     let state = &mut data.state;
+
     let (mut backend, mut winit) = winit::init()?;
 
     let mode = Mode {
@@ -58,7 +72,7 @@ fn init_winit(
         },
     );
 
-    let _global = output.create_global::<FlyJa>(&display.handle());
+    let _global = output.create_global::<FlyJa<T>>(&display.handle());
     output.change_current_state(
         Some(mode),
         Some(Transform::Flipped180),
@@ -94,14 +108,17 @@ fn init_winit(
     Ok(())
 }
 
-fn winit_dispatch(
+fn winit_dispatch<T>(
     backend: &mut WinitGraphicsBackend<GlesRenderer>,
     winit: &mut WinitEventLoop,
-    data: &mut CalloopData,
+    data: &mut CalloopData<T>,
     output: &Output,
     damage_tracked_renderer: &mut OutputDamageTracker,
     full_redraw: &mut u8,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), Box<dyn std::error::Error>>
+where
+    T: Backend + 'static,
+{
     let display = &mut data.display;
     let state = &mut data.state;
 

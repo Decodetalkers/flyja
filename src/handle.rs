@@ -7,9 +7,9 @@ use smithay::{
     wayland::data_device::{ClientDndGrabHandler, DataDeviceHandler, ServerDndGrabHandler},
 };
 
-use crate::state::FlyJa;
+use crate::state::{Backend, FlyJa};
 
-impl SeatHandler for FlyJa {
+impl<BackendData: Backend> SeatHandler for FlyJa<BackendData> {
     type KeyboardFocus = WlSurface;
     type PointerFocus = WlSurface;
     fn seat_state(&mut self) -> &mut smithay::input::SeatState<Self> {
@@ -28,24 +28,24 @@ impl SeatHandler for FlyJa {
     ) {
     }
 }
-delegate_seat!(FlyJa);
+delegate_seat!(@<BackendData: Backend + 'static>FlyJa<BackendData>);
 
 //
 // Wl Data Device
 //
 //
-impl DataDeviceHandler for FlyJa {
+impl<BackendData: Backend> DataDeviceHandler for FlyJa<BackendData> {
     type SelectionUserData = ();
     fn data_device_state(&self) -> &smithay::wayland::data_device::DataDeviceState {
         &self.data_device_state
     }
 }
 
-impl ClientDndGrabHandler for FlyJa {}
-impl ServerDndGrabHandler for FlyJa {}
+impl<BackendData: Backend> ClientDndGrabHandler for FlyJa<BackendData> {}
+impl<BackendData: Backend> ServerDndGrabHandler for FlyJa<BackendData> {}
 
-delegate_data_device!(FlyJa);
+delegate_data_device!(@<BackendData: Backend + 'static>FlyJa<BackendData>);
 
 // Wl Output & Xdg Output
 
-delegate_output!(FlyJa);
+delegate_output!(@<BackendData: Backend + 'static> FlyJa <BackendData>);
