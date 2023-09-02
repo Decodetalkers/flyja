@@ -4,6 +4,7 @@ mod input;
 mod shell;
 mod state;
 mod winit;
+mod udev;
 
 pub use state::FlyJa;
 

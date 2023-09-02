@@ -36,7 +36,7 @@ pub fn run_winit() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut display: Display<FlyJa<WinitData>> = Display::new()?;
     let data = WinitData;
-    let state = FlyJa::new(data, &mut event_loop, &mut display);
+    let state = FlyJa::init(data, &mut event_loop, &mut display);
 
     let mut data = CalloopData { state, display };
     init_winit(&mut event_loop, &mut data)?;

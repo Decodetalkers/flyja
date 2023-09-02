@@ -44,8 +44,9 @@ impl<BackendData: Backend> XdgShellHandler for FlyJa<BackendData> {
     }
     fn new_toplevel(&mut self, surface: smithay::wayland::shell::xdg::ToplevelSurface) {
         let window = WindowElement::new(surface, Point::from((0.0, 0.0)));
-        self.space.map_element(window.clone(), (0, 0), false);
-
+        let position = self.pointer.current_location();
+        self.space
+            .map_element(window.clone(), position.to_i32_round(), false);
         self.reseize_state = PeddingResize::ReadyToResize;
     }
 

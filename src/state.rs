@@ -73,16 +73,18 @@ pub struct FlyJa<BackendData: Backend + 'static> {
     pub shm_state: ShmState,
     pub output_manager_state: OutputManagerState,
     pub seat_state: SeatState<FlyJa<BackendData>>,
+    pub pointer: PointerHandle<FlyJa<BackendData>>,
     pub data_device_state: DataDeviceState,
 
     pub seat: Seat<Self>,
+    pub seat_name: String,
 
     pub reseize_state: PeddingResize,
     pub wmstatus: WmStatus,
 }
 
 impl<BackendData: Backend + 'static> FlyJa<BackendData> {
-    pub fn new(
+    pub fn init(
         backend_data: BackendData,
         event_loop: &mut EventLoop<CalloopData<BackendData>>,
         display: &mut Display<FlyJa<BackendData>>,
@@ -102,7 +104,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
 
         seat.add_keyboard(Default::default(), 200, 200).unwrap();
 
-        seat.add_pointer();
+        let pointer = seat.add_pointer();
 
         let space = Space::default();
 
@@ -110,6 +112,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
 
         let loop_signal = event_loop.get_signal();
 
+        let seat_name = backend_data.seat_name();
         Self {
             backend_data,
             start_time,
@@ -122,9 +125,13 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
             xdg_shell_state,
             shm_state,
             output_manager_state,
+
             seat_state,
             data_device_state,
             seat,
+            pointer,
+            seat_name,
+
             reseize_state: PeddingResize::Stop,
             wmstatus: WmStatus::Stack,
         }
