@@ -28,7 +28,7 @@ impl<BackendData: Backend> SeatHandler for FlyJa<BackendData> {
     ) {
     }
 }
-delegate_seat!(@<BackendData: Backend + 'static>FlyJa<BackendData>);
+delegate_seat!(@<BackendData: Backend + 'static> FlyJa<BackendData>);
 
 //
 // Wl Data Device
@@ -44,7 +44,7 @@ impl<BackendData: Backend> DataDeviceHandler for FlyJa<BackendData> {
 impl<BackendData: Backend> ClientDndGrabHandler for FlyJa<BackendData> {}
 impl<BackendData: Backend> ServerDndGrabHandler for FlyJa<BackendData> {}
 
-delegate_data_device!(@<BackendData: Backend + 'static>FlyJa<BackendData>);
+delegate_data_device!(@<BackendData: Backend + 'static> FlyJa<BackendData>);
 
 // Wl Output & Xdg Output
 

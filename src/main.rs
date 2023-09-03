@@ -3,8 +3,8 @@ mod handle;
 mod input;
 mod shell;
 mod state;
-mod winit;
 mod udev;
+mod winit;
 
 pub use state::FlyJa;
 

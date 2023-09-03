@@ -22,7 +22,7 @@ use smithay::{
 use crate::{
     grab::move_grab::MoveSurfaceGrab,
     shell::WindowElement,
-    state::{Backend, PeddingResize},
+    state::{Backend, PeddingResize, WmStatus},
     FlyJa,
 };
 
@@ -44,9 +44,13 @@ impl<BackendData: Backend> XdgShellHandler for FlyJa<BackendData> {
     }
     fn new_toplevel(&mut self, surface: smithay::wayland::shell::xdg::ToplevelSurface) {
         let window = WindowElement::new(surface, Point::from((0.0, 0.0)));
-        let position = self.pointer.current_location();
-        self.space
-            .map_element(window.clone(), position.to_i32_round(), false);
+        let position = match self.wmstatus {
+            WmStatus::Stack | WmStatus::TiteToStack => {
+                self.pointer.current_location().to_i32_round()
+            }
+            _ => (0, 0).into(),
+        };
+        self.space.map_element(window.clone(), position, false);
         self.reseize_state = PeddingResize::ReadyToResize;
     }
 
