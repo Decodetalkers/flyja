@@ -3,7 +3,10 @@ mod handle;
 mod input;
 mod shell;
 mod state;
+
+#[allow(unused)]
 mod udev;
+
 mod winit;
 
 pub use state::FlyJa;

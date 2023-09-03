@@ -243,6 +243,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         self.wmstatus.status_change();
         let elements: Vec<_> = self.space.elements().cloned().collect();
         for element in elements {
+            // TODO: clone element and storage data
             self.space.map_element(element, (0, 0), false);
         }
     }
