@@ -48,8 +48,12 @@ impl<BackendData: Backend> CompositorHandler for FlyJa<BackendData> {
 
         self.handle_state_change_event();
 
-        self.handle_resize_event();
-        self.handle_resize_event_finished();
+        // Stack
+        self.handle_place_stack_to_center();
+
+        // Tile
+        self.handle_resize_tile_window_changing();
+        self.handle_resize_tile_window_finished();
 
         if let PeddingResize::ReadyToResize = self.reseize_state {
             self.reseize_state = PeddingResize::Resizing(surface.clone());

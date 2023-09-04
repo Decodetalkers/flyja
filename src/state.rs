@@ -27,7 +27,7 @@ pub trait Backend {
 
 use crate::{shell::WindowElement, CalloopData};
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub enum WmStatus {
     Tile,
     TiteToStack,
@@ -195,7 +195,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
             })
     }
 
-    pub fn handle_resize_event(&mut self) {
+    pub fn handle_resize_tile_window_changing(&mut self) {
         let PeddingResize::Resizing(ref surface) = self.reseize_state else {
             return;
         };
@@ -216,10 +216,45 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         self.reseize_state = PeddingResize::ResizeFinished(surface.clone());
     }
 
-    pub fn handle_resize_event_finished(&mut self) {
+    pub fn handle_place_stack_to_center(&mut self) {
+        if self.wmstatus != WmStatus::Stack {
+            return;
+        }
         let PeddingResize::ResizeFinished(ref surface) = self.reseize_state else {
             return;
         };
+        let Some(output) = self
+            .space
+            .output_under(self.pointer.current_location())
+            .next()
+        else {
+            return;
+        };
+        let Some(geo) = self.space.output_geometry(output) else {
+            return;
+        };
+
+        let Some(window) = self
+            .space
+            .elements()
+            .find(|w| w.toplevel().wl_surface() == surface)
+        else {
+            return;
+        };
+        let gerwindow = window.geometry();
+        let pos_x = geo.size.w / 2 - gerwindow.size.w / 2;
+        let pox_y = geo.size.h / 2 - gerwindow.size.h / 2;
+        self.space
+            .map_element(window.clone(), (pos_x, pox_y), false);
+    }
+
+    pub fn handle_resize_tile_window_finished(&mut self) {
+        let PeddingResize::ResizeFinished(ref surface) = self.reseize_state else {
+            return;
+        };
+        if self.wmstatus != WmStatus::Tile {
+            return;
+        }
         let Some(window) = self
             .space
             .elements()
