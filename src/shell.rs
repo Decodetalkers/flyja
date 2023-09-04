@@ -15,16 +15,16 @@ use smithay::{
     wayland::{compositor::SurfaceData, shell::xdg::ToplevelSurface},
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
-pub struct WindowInfo {
-    pub position: Point<f64, Logical>,
-}
+//#[derive(Debug, Clone, Copy, PartialEq, Default)]
+//pub struct WindowInfo {
+//    pub position: Point<f64, Logical>,
+//}
 
 #[derive(Debug, Clone)]
 pub struct WindowElement {
     window: Window,
-    pub tileinfo: WindowInfo,
-    pub normalinfo: WindowInfo,
+    //pub tileinfo: WindowInfo,
+    //pub normalinfo: WindowInfo,
 }
 
 impl PartialEq for WindowElement {
@@ -34,11 +34,11 @@ impl PartialEq for WindowElement {
 }
 
 impl WindowElement {
-    pub fn new(surface: ToplevelSurface, position: Point<f64, Logical>) -> Self {
+    pub fn new(surface: ToplevelSurface) -> Self {
         WindowElement {
             window: Window::new(surface),
-            tileinfo: WindowInfo { position },
-            normalinfo: WindowInfo { position },
+            //tileinfo: WindowInfo { position },
+            //normalinfo: WindowInfo { position },
         }
     }
 

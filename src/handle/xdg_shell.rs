@@ -12,7 +12,7 @@ use smithay::{
             Resource,
         },
     },
-    utils::{Point, Serial},
+    utils::Serial,
     wayland::{
         compositor::with_states,
         shell::xdg::{Configure, ToplevelSurface, XdgShellHandler, XdgToplevelSurfaceData},
@@ -43,7 +43,7 @@ impl<BackendData: Backend> XdgShellHandler for FlyJa<BackendData> {
         // TODO:
     }
     fn new_toplevel(&mut self, surface: smithay::wayland::shell::xdg::ToplevelSurface) {
-        let window = WindowElement::new(surface, Point::from((0.0, 0.0)));
+        let window = WindowElement::new(surface);
         //let position = match self.wmstatus {
         //    WmStatus::Stack | WmStatus::TiteToStack => {
         //        self.pointer.current_location().to_i32_round()

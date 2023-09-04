@@ -27,7 +27,7 @@ impl<BackendData: Backend> PointerGrab<FlyJa<BackendData>> for MoveSurfaceGrab<B
 
         let delta = event.location - self.start_data.location;
         let new_location = self.initial_window_location.to_f64() + delta;
-        self.window.tileinfo.position = new_location;
+        //self.window.tileinfo.position = new_location;
 
         data.space
             .map_element(self.window.clone(), new_location.to_i32_round(), true);
