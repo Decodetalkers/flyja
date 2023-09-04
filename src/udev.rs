@@ -32,7 +32,7 @@ pub fn run_udev() {
             return;
         }
     };
-    let primary_gpu = primary_gpu(&session.seat())
+    let primary_gpu = primary_gpu(session.seat())
         .unwrap()
         .and_then(|x| {
             DrmNode::from_path(x)
@@ -54,7 +54,7 @@ pub fn run_udev() {
 
     let mut state = FlyJa::init(data, &mut event_loop, &mut display);
 
-    let udev_backend = match UdevBackend::new(&state.seat_name) {
+    let udev_backend = match UdevBackend::new(state.seat_name) {
         Ok(ret) => ret,
         Err(err) => {
             error!(error = ?err,"Failed to initialize udev backend");
