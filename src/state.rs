@@ -30,10 +30,8 @@ use crate::{shell::WindowElement, CalloopData};
 #[derive(Debug, Default, PartialEq, Eq)]
 pub enum WmStatus {
     Tile,
-    TiteToStack,
     #[default]
     Stack,
-    StackToTite,
 }
 
 #[derive(Debug, Default)]
@@ -48,14 +46,9 @@ pub enum PeddingResize {
 impl WmStatus {
     pub fn status_change(&mut self) {
         match self {
-            WmStatus::Tile => *self = WmStatus::TiteToStack,
-            WmStatus::TiteToStack => *self = WmStatus::Stack,
-            WmStatus::Stack => *self = WmStatus::StackToTite,
-            WmStatus::StackToTite => *self = WmStatus::Tile,
+            WmStatus::Tile => *self = WmStatus::Stack,
+            WmStatus::Stack => *self = WmStatus::Tile,
         }
-    }
-    pub fn is_changing(&self) -> bool {
-        matches!(self, WmStatus::StackToTite | WmStatus::TiteToStack)
     }
 }
 
@@ -133,7 +126,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
             seat_name,
 
             reseize_state: PeddingResize::Stop,
-            wmstatus: WmStatus::Stack,
+            wmstatus: WmStatus::Tile,
         }
     }
 
@@ -181,6 +174,35 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         socket_name
     }
 
+    fn get_size_and_point(&mut self) -> Option<(i32, i32, i32, i32)> {
+        let Some(window) = self.space.elements().find(|w| {
+            w.toplevel()
+                .current_state()
+                .states
+                .contains(xdg_toplevel::State::Activated)
+        }) else {
+            return None;
+        };
+
+        let geometry = window.geometry();
+
+        let x = geometry.loc.x + geometry.size.w / 2;
+        // ???
+        let y = window.geometry().loc.y;
+
+        let width = geometry.size.w / 2;
+        let height = geometry.size.h;
+        let surface = window.toplevel();
+
+        surface.with_pending_state(|state| {
+            state.states.set(xdg_toplevel::State::Resizing);
+            state.size = Some((width, height).into());
+        });
+        surface.send_pending_configure();
+
+        Some((x, y, width, height))
+    }
+
     pub fn surface_under_pointer(
         &self,
         pointer: &PointerHandle<Self>,
@@ -195,8 +217,40 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
             })
     }
 
-    pub fn handle_resize_tile_window_changing(&mut self) {
-        let PeddingResize::Resizing(ref surface) = self.reseize_state else {
+    fn handle_one_element(&mut self, surface: &WlSurface) {
+        let Some(window) = self
+            .space
+            .elements()
+            .find(|w| w.toplevel().wl_surface() == surface)
+        else {
+            return;
+        };
+        let prosize = 'block: {
+            let Some(output) = self
+                .space
+                .output_under(self.pointer.current_location())
+                .next()
+            else {
+                break 'block Size::from((1000, 1000));
+            };
+            let Some(geo) = self.space.output_geometry(output) else {
+                break 'block Size::from((1000, 1000));
+            };
+            geo.size
+        };
+        let surface_top = window.toplevel();
+        surface_top.with_pending_state(|state| {
+            state.states.set(xdg_toplevel::State::Resizing);
+            let size = prosize;
+            state.size = Some(size);
+        });
+        surface_top.send_configure();
+    }
+
+    fn handle_split_element(&mut self, surface: &WlSurface) {
+        self.reseize_state = PeddingResize::ResizeFinished(surface.clone());
+
+        let Some((x, y, width, height)) = self.get_size_and_point() else {
             return;
         };
         let Some(window) = self
@@ -206,14 +260,25 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         else {
             return;
         };
-        let surface_top = window.toplevel();
-        surface_top.with_pending_state(|state| {
+        let surface = window.toplevel();
+        surface.with_pending_state(|state| {
             state.states.set(xdg_toplevel::State::Resizing);
-            let size = Size::from((1000, 1000));
-            state.size = Some(size);
+            state.size = Some((width, height).into());
         });
-        surface_top.send_configure();
-        self.reseize_state = PeddingResize::ResizeFinished(surface.clone());
+        surface.send_pending_configure();
+        self.space.map_element(window.clone(), (x, y), false);
+    }
+
+    pub fn handle_resize_tile_window_changing(&mut self) {
+        let PeddingResize::Resizing(ref surface) = self.reseize_state else {
+            return;
+        };
+        let count = self.space.elements().count();
+        if count == 1 {
+            self.handle_one_element(&surface.clone());
+        } else {
+            self.handle_split_element(&surface.clone());
+        }
     }
 
     pub fn handle_place_stack_to_center(&mut self) {
@@ -268,19 +333,6 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         });
         surface.send_configure();
         self.reseize_state = PeddingResize::Stop;
-    }
-
-    pub fn handle_state_change_event(&mut self) {
-        if !self.wmstatus.is_changing() {
-            return;
-        }
-
-        self.wmstatus.status_change();
-        let elements: Vec<_> = self.space.elements().cloned().collect();
-        for element in elements {
-            // TODO: clone element and storage data
-            self.space.map_element(element, (0, 0), false);
-        }
     }
 
     pub fn publish_commit(&self) {

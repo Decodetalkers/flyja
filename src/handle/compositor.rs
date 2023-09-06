@@ -46,8 +46,6 @@ impl<BackendData: Backend> CompositorHandler for FlyJa<BackendData> {
 
         xdg_shell::handle_commit(&mut self.space, surface);
 
-        self.handle_state_change_event();
-
         // Stack
         self.handle_place_stack_to_center();
 

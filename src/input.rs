@@ -53,10 +53,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
                     }
                 }
                 KeyAction::ChangeWmState => {
-                    if !self.wmstatus.is_changing() {
-                        self.wmstatus.status_change();
-                        self.publish_commit();
-                    }
+                    self.wmstatus.status_change();
                 }
                 _ => {}
             },
