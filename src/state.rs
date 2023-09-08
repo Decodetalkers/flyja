@@ -331,9 +331,6 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
 
     // FIXME: I do not know when I can get the geometry
     pub fn handle_place_stack_to_center(&mut self) {
-        if self.wmstatus != WmStatus::Stack {
-            return;
-        }
         let PeddingResize::ResizeFinished(ref surface) = self.reseize_state else {
             return;
         };

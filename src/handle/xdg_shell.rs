@@ -1,6 +1,5 @@
 use smithay::{
     delegate_xdg_shell,
-    desktop::Space,
     input::{
         pointer::{Focus, GrabStartData},
         Seat,
@@ -97,30 +96,34 @@ impl<BackendData: Backend> XdgShellHandler for FlyJa<BackendData> {
     fn ack_configure(&mut self, _surface: wl_surface::WlSurface, _configure: Configure) {}
 }
 
-pub fn handle_commit(
-    space: &mut Space<WindowElement>,
-    surface: &wl_surface::WlSurface,
-) -> Option<()> {
-    let window = space
-        .elements()
-        .find(|w| w.toplevel().wl_surface() == surface)
-        .cloned()?;
-    let initial_configure_sent = with_states(surface, |states| {
-        states
-            .data_map
-            .get::<XdgToplevelSurfaceData>()
-            .unwrap()
-            .lock()
-            .unwrap()
-            .initial_configure_sent
-    });
+impl<BackendData: Backend + 'static> FlyJa<BackendData> {
+    pub fn handle_commit(&mut self, surface: &wl_surface::WlSurface) -> Option<()> {
+        let window = self
+            .space
+            .elements()
+            .find(|w| w.toplevel().wl_surface() == surface)
+            .cloned()?;
+        let initial_configure_sent = with_states(surface, |states| {
+            states
+                .data_map
+                .get::<XdgToplevelSurfaceData>()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .initial_configure_sent
+        });
 
-    if !initial_configure_sent {
-        window.toplevel().send_configure();
+        if !initial_configure_sent {
+            window.toplevel().send_configure();
+            if let WmStatus::Stack = self.wmstatus {
+                self.reseize_state = PeddingResize::ResizeFinished(surface.clone());
+            }
+        }
+
+        Some(())
     }
-
-    Some(())
 }
+
 delegate_xdg_shell!(@<BackendData: Backend + 'static> FlyJa<BackendData>);
 
 fn check_grab<T>(

@@ -17,8 +17,6 @@ use crate::{
     FlyJa,
 };
 
-use super::xdg_shell;
-
 impl<BackendData: Backend> CompositorHandler for FlyJa<BackendData> {
     fn compositor_state(&mut self) -> &mut CompositorState {
         &mut self.compositor_state
@@ -44,12 +42,12 @@ impl<BackendData: Backend> CompositorHandler for FlyJa<BackendData> {
             }
         }
 
-        xdg_shell::handle_commit(&mut self.space, surface);
+        self.handle_commit(surface);
 
-        // Stack
-        //if self.wmstatus == WmStatus::Stack {
-        //    self.handle_place_stack_to_center();
-        //}
+        // TODO: need know the geo before put it to center
+        // if self.wmstatus == WmStatus::Stack {
+        //     self.handle_place_stack_to_center();
+        // }
 
         // Tile
         if self.wmstatus == WmStatus::Tile {
