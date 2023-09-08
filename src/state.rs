@@ -9,7 +9,7 @@ use smithay::{
         wayland_protocols::xdg::shell::server::xdg_toplevel,
         wayland_server::{backend::ClientData, protocol::wl_surface::WlSurface, Display},
     },
-    utils::{Logical, Point, Size},
+    utils::{Logical, Point},
     wayland::{
         compositor::{CompositorClientState, CompositorState},
         data_device::DataDeviceState,
@@ -271,16 +271,16 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         else {
             return;
         };
-        let prosize = 'block: {
+        let prosize = {
             let Some(output) = self
                 .space
                 .output_under(self.pointer.current_location())
                 .next()
             else {
-                break 'block Size::from((1000, 1000));
+                return;
             };
             let Some(geo) = self.space.output_geometry(output) else {
-                break 'block Size::from((1000, 1000));
+                return;
             };
             geo.size
         };
