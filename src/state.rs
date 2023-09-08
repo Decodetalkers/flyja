@@ -1,7 +1,7 @@
 use std::{ffi::OsString, os::unix::io::AsRawFd, sync::Arc};
 
 use smithay::{
-    desktop::{Space, WindowSurfaceType},
+    desktop::{space::SpaceElement, Space, WindowSurfaceType},
     input::Seat,
     input::{pointer::PointerHandle, SeatState},
     reexports::{
@@ -186,9 +186,10 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
 
         let geometry = window.geometry();
 
-        let x = geometry.loc.x + geometry.size.w / 2;
-        // ???
-        let y = window.geometry().loc.y;
+        let Some(Point { x, y, .. }) = self.space.element_location(window) else {
+            return None;
+        };
+        let x = x + geometry.size.w / 2;
 
         let width = geometry.size.w / 2;
         let height = geometry.size.h;
@@ -266,7 +267,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
             state.size = Some((width, height).into());
         });
         surface.send_pending_configure();
-        self.space.map_element(window.clone(), (x, y), false);
+        self.space.map_element(window.clone(), (x, y), true);
     }
 
     pub fn handle_resize_tile_window_changing(&mut self) {

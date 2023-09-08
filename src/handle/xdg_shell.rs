@@ -50,7 +50,7 @@ impl<BackendData: Backend> XdgShellHandler for FlyJa<BackendData> {
         //    }
         //    _ => (0, 0).into(),
         //};
-        self.space.map_element(window.clone(), (0, 0), false);
+        self.space.map_element(window.clone(), (0, 0), true);
         self.reseize_state = PeddingResize::ReadyToResize;
     }
 
@@ -96,10 +96,10 @@ impl<BackendData: Backend> XdgShellHandler for FlyJa<BackendData> {
         pointer.set_grab(self, grab, serial, Focus::Clear);
     }
 
-    fn ack_configure(&mut self, _surface: wl_surface::WlSurface, configure: Configure) {
-        if let Configure::Toplevel(configure) = configure {
-            println!("{:?}", configure.state);
-        }
+    fn ack_configure(&mut self, _surface: wl_surface::WlSurface, _configure: Configure) {
+        //if let Configure::Toplevel(configure) = configure {
+        //    println!("{:?}", configure.state);
+        //}
     }
 }
 
