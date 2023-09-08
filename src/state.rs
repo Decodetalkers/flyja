@@ -9,7 +9,7 @@ use smithay::{
         wayland_protocols::xdg::shell::server::xdg_toplevel,
         wayland_server::{backend::ClientData, protocol::wl_surface::WlSurface, Display},
     },
-    utils::{Logical, Point},
+    utils::{Logical, Point, Size},
     wayland::{
         compositor::{CompositorClientState, CompositorState},
         data_device::DataDeviceState,
@@ -41,6 +41,17 @@ pub enum PeddingResize {
     ResizeTwoWindowFinished((WlSurface, WlSurface)),
     #[default]
     Stop,
+}
+
+#[derive(Debug, Default)]
+pub enum WindowRemoved {
+    #[default]
+    NoState,
+    Region {
+        pos_start: (i32, i32),
+        pos_end: (i32, i32),
+    },
+    PeddingResizeFinished(WlSurface),
 }
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -82,6 +93,7 @@ pub struct FlyJa<BackendData: Backend + 'static> {
     pub reseize_state: PeddingResize,
     pub wmstatus: WmStatus,
     pub splitstate: SplitState,
+    pub window_remove_state: WindowRemoved,
 }
 
 impl<BackendData: Backend + 'static> FlyJa<BackendData> {
@@ -136,6 +148,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
             reseize_state: PeddingResize::Stop,
             wmstatus: WmStatus::Tile,
             splitstate: SplitState::H,
+            window_remove_state: WindowRemoved::NoState,
         }
     }
 
@@ -232,6 +245,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
             }
             SplitState::V => {
                 let y = y + geometry.size.h / 2;
+
                 let width = geometry.size.w;
                 let height = geometry.size.h / 2;
                 (x, y, width, height)
@@ -417,6 +431,100 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         });
         surface.send_configure();
         self.reseize_state = PeddingResize::Stop;
+    }
+
+    pub fn handle_window_removed_finished(&mut self) {
+        let WindowRemoved::PeddingResizeFinished(ref surface) = self.window_remove_state else {
+            return;
+        };
+        let Some(window) = self
+            .space
+            .elements()
+            .find(|w| w.toplevel().wl_surface() == surface)
+        else {
+            return;
+        };
+        let surface = window.toplevel();
+        surface.with_pending_state(|state| {
+            state.states.unset(xdg_toplevel::State::Resizing);
+        });
+        surface.send_configure();
+        self.window_remove_state = WindowRemoved::NoState;
+    }
+
+    pub fn handle_window_removed(&mut self) {
+        let WindowRemoved::Region { pos_start, pos_end } = self.window_remove_state else {
+            return;
+        };
+        let mut window: Option<WindowElement> = None;
+        if let Some(window_a) = self
+            .space
+            .elements()
+            .find(|window| window.is_to_resize_v_down(pos_start, pos_end, &self.space))
+        {
+            let Size { w, h, .. } = window_a.geometry().size;
+            let height_add = pos_end.1 - pos_start.1;
+            let surface = window_a.toplevel();
+            surface.with_pending_state(|state| {
+                state.states.set(xdg_toplevel::State::Resizing);
+                state.size = Some((w, h + height_add).into());
+            });
+            self.window_remove_state =
+                WindowRemoved::PeddingResizeFinished(surface.wl_surface().clone());
+            return;
+        }
+
+        if let Some(window_a) = self
+            .space
+            .elements()
+            .find(|window| window.is_to_resize_h_left(pos_start, pos_end, &self.space))
+        {
+            let Size { w, h, .. } = window_a.geometry().size;
+            let width_add = pos_end.0 - pos_start.0;
+            let surface = window_a.toplevel();
+            surface.with_pending_state(|state| {
+                state.states.set(xdg_toplevel::State::Resizing);
+                state.size = Some((w + width_add, h).into());
+            });
+            self.window_remove_state =
+                WindowRemoved::PeddingResizeFinished(surface.wl_surface().clone());
+            return;
+        }
+
+        if let Some(window_a) = self
+            .space
+            .elements()
+            .find(|window| window.is_to_resize_v_top(pos_start, pos_end, &self.space))
+        {
+            window = Some(window_a.clone());
+            let Size { w, h, .. } = window_a.geometry().size;
+            let height_add = pos_end.1 - pos_start.1;
+            let surface = window_a.toplevel();
+            surface.with_pending_state(|state| {
+                state.states.set(xdg_toplevel::State::Resizing);
+                state.size = Some((w, h + height_add).into());
+            });
+            self.window_remove_state =
+                WindowRemoved::PeddingResizeFinished(surface.wl_surface().clone());
+        } else if let Some(window_a) = self
+            .space
+            .elements()
+            .find(|window| window.is_to_resize_h_right(pos_start, pos_end, &self.space))
+        {
+            window = Some(window_a.clone());
+            let Size { w, h, .. } = window_a.geometry().size;
+            let width_add = pos_end.0 - pos_start.0;
+            let surface = window_a.toplevel();
+            surface.with_pending_state(|state| {
+                state.states.set(xdg_toplevel::State::Resizing);
+                state.size = Some((w + width_add, h).into());
+            });
+            self.window_remove_state =
+                WindowRemoved::PeddingResizeFinished(surface.wl_surface().clone());
+        }
+        if let Some(window) = window {
+            self.space.map_element(window, pos_start, true);
+        }
     }
 
     pub fn publish_commit(&self) {

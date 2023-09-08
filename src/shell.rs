@@ -7,11 +7,11 @@ use smithay::{
         },
         ImportAll, ImportMem, Renderer,
     },
-    desktop::{space::SpaceElement, Window, WindowSurfaceType},
+    desktop::{space::SpaceElement, Space, Window, WindowSurfaceType},
     output::Output,
     reexports::wayland_server::protocol::wl_surface,
     render_elements,
-    utils::{IsAlive, Logical, Physical, Point, Rectangle, Scale},
+    utils::{IsAlive, Logical, Physical, Point, Rectangle, Scale, Size},
     wayland::{compositor::SurfaceData, shell::xdg::ToplevelSurface},
 };
 
@@ -72,6 +72,73 @@ impl WindowElement {
 
     pub fn geometry(&self) -> Rectangle<i32, Logical> {
         self.window.geometry()
+    }
+}
+
+impl WindowElement {
+    pub fn is_to_resize_v_down(
+        &self,
+        (start_x, start_y): (i32, i32),
+        (end_x, _end_y): (i32, i32),
+        space: &Space<Self>,
+    ) -> bool {
+        let Some(Point { x, y, .. }) = space.element_location(self) else {
+            return false;
+        };
+        let geometry = self.geometry();
+        let Size {
+            w: width,
+            h: height,
+            ..
+        } = geometry.size;
+        x == start_x && x + width == end_x && y + height == start_y
+    }
+
+    pub fn is_to_resize_v_top(
+        &self,
+        (start_x, _start_y): (i32, i32),
+        (end_x, end_y): (i32, i32),
+        space: &Space<Self>,
+    ) -> bool {
+        let Some(Point { x, y, .. }) = space.element_location(self) else {
+            return false;
+        };
+        let geometry = self.geometry();
+        let Size { w: width, .. } = geometry.size;
+        x == start_x && x + width == end_x && y == end_y
+    }
+
+    pub fn is_to_resize_h_right(
+        &self,
+        (_start_x, start_y): (i32, i32),
+        (end_x, end_y): (i32, i32),
+        space: &Space<Self>,
+    ) -> bool {
+        println!("{end_x}, {end_y}");
+        let Some(Point { x, y, .. }) = space.element_location(self) else {
+            return false;
+        };
+        let geometry = self.geometry();
+        let Size { h: height, .. } = geometry.size;
+        x == end_x && y + height == end_y && y == start_y
+    }
+
+    pub fn is_to_resize_h_left(
+        &self,
+        (start_x, start_y): (i32, i32),
+        (_end_x, end_y): (i32, i32),
+        space: &Space<Self>,
+    ) -> bool {
+        let Some(Point { x, y, .. }) = space.element_location(self) else {
+            return false;
+        };
+        let geometry = self.geometry();
+        let Size {
+            h: height,
+            w: width,
+            ..
+        } = geometry.size;
+        x + width == start_x && y + height == end_y && y == start_y
     }
 }
 

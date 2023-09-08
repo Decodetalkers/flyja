@@ -11,7 +11,7 @@ use smithay::{
             Resource,
         },
     },
-    utils::Serial,
+    utils::{Point, Serial, Size},
     wayland::{
         compositor::with_states,
         shell::xdg::{Configure, ToplevelSurface, XdgShellHandler, XdgToplevelSurfaceData},
@@ -21,7 +21,7 @@ use smithay::{
 use crate::{
     grab::move_grab::MoveSurfaceGrab,
     shell::WindowElement,
-    state::{Backend, PeddingResize, WmStatus},
+    state::{Backend, PeddingResize, WindowRemoved, WmStatus},
     FlyJa,
 };
 
@@ -42,13 +42,32 @@ impl<BackendData: Backend> XdgShellHandler for FlyJa<BackendData> {
         // TODO:
     }
 
-    fn new_toplevel(&mut self, surface: smithay::wayland::shell::xdg::ToplevelSurface) {
+    fn new_toplevel(&mut self, surface: ToplevelSurface) {
         let window = WindowElement::new(surface.clone());
         self.space.map_element(window.clone(), (0, 0), true);
         self.reseize_state = PeddingResize::Resizing(surface.wl_surface().clone());
     }
 
-    fn toplevel_destroyed(&mut self, _surface: smithay::wayland::shell::xdg::ToplevelSurface) {
+    fn toplevel_destroyed(&mut self, surface: ToplevelSurface) {
+        let Some(window) = self
+            .space
+            .elements()
+            .find(|w| w.toplevel().wl_surface() == surface.wl_surface())
+        else {
+            return;
+        };
+        let Some(Point { x, y, .. }) = self.space.element_location(window) else {
+            return;
+        };
+        let Size {
+            w: width,
+            h: height,
+            ..
+        } = window.geometry().size;
+        self.window_remove_state = WindowRemoved::Region {
+            pos_start: (x, y),
+            pos_end: (x + width, y + height),
+        };
         // TODO: resize again
     }
 
