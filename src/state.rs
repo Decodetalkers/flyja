@@ -307,6 +307,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         }
     }
 
+    // FIXME: I do not know when I can get the geometry
     pub fn handle_place_stack_to_center(&mut self) {
         if self.wmstatus != WmStatus::Stack {
             return;
@@ -314,6 +315,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         let PeddingResize::ResizeFinished(ref surface) = self.reseize_state else {
             return;
         };
+
         let Some(output) = self
             .space
             .output_under(self.pointer.current_location())
@@ -337,6 +339,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         let pox_y = geo.size.h / 2 - gerwindow.size.h / 2;
         self.space
             .map_element(window.clone(), (pos_x, pox_y), false);
+        self.reseize_state = PeddingResize::Stop;
     }
 
     pub fn handle_resize_tile_split_window_finished(&mut self) {
