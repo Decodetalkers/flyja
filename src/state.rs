@@ -44,6 +44,13 @@ pub enum PeddingResize {
     Stop,
 }
 
+#[derive(Debug, Default)]
+pub enum SplitState {
+    #[default]
+    H,
+    V,
+}
+
 impl WmStatus {
     pub fn status_change(&mut self) {
         match self {
@@ -75,6 +82,7 @@ pub struct FlyJa<BackendData: Backend + 'static> {
 
     pub reseize_state: PeddingResize,
     pub wmstatus: WmStatus,
+    pub splitstate: SplitState,
 }
 
 impl<BackendData: Backend + 'static> FlyJa<BackendData> {
@@ -128,6 +136,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
 
             reseize_state: PeddingResize::Stop,
             wmstatus: WmStatus::Tile,
+            splitstate: SplitState::H,
         }
     }
 
@@ -190,10 +199,22 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         let Some(Point { x, y, .. }) = self.space.element_location(window) else {
             return None;
         };
-        let x = x + geometry.size.w / 2;
 
-        let width = geometry.size.w / 2;
-        let height = geometry.size.h;
+        let (x, y, width, height) = match self.splitstate {
+            SplitState::H => {
+                let x = x + geometry.size.w / 2;
+
+                let width = geometry.size.w / 2;
+                let height = geometry.size.h;
+                (x, y, width, height)
+            }
+            SplitState::V => {
+                let y = y + geometry.size.h / 2;
+                let width = geometry.size.w;
+                let height = geometry.size.h / 2;
+                (x, y, width, height)
+            }
+        };
         let surface = window.toplevel();
 
         surface.with_pending_state(|state| {

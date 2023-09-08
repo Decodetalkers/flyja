@@ -94,11 +94,7 @@ impl<BackendData: Backend> XdgShellHandler for FlyJa<BackendData> {
         pointer.set_grab(self, grab, serial, Focus::Clear);
     }
 
-    fn ack_configure(&mut self, _surface: wl_surface::WlSurface, _configure: Configure) {
-        //if let Configure::Toplevel(configure) = configure {
-        //    println!("{:?}", configure.state);
-        //}
-    }
+    fn ack_configure(&mut self, _surface: wl_surface::WlSurface, _configure: Configure) {}
 }
 
 pub fn handle_commit(
