@@ -114,7 +114,6 @@ impl WindowElement {
         (end_x, end_y): (i32, i32),
         space: &Space<Self>,
     ) -> bool {
-        println!("{end_x}, {end_y}");
         let Some(Point { x, y, .. }) = space.element_location(self) else {
             return false;
         };
