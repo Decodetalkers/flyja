@@ -1,7 +1,7 @@
 use std::{ffi::OsString, os::unix::io::AsRawFd, sync::Arc};
 
 use smithay::{
-    desktop::{space::SpaceElement, Space, WindowSurfaceType},
+    desktop::{Space, WindowSurfaceType},
     input::Seat,
     input::{pointer::PointerHandle, SeatState},
     reexports::{
@@ -219,6 +219,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
     }
 
     fn handle_one_element(&mut self, surface: &WlSurface) {
+        self.reseize_state = PeddingResize::ResizeFinished(surface.clone());
         let Some(window) = self
             .space
             .elements()
