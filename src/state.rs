@@ -39,6 +39,7 @@ pub enum PeddingResize {
     ReadyToResize,
     Resizing(WlSurface),
     ResizeFinished(WlSurface),
+    ResizeTwoWindowFinished((WlSurface, WlSurface)),
     #[default]
     Stop,
 }
@@ -174,7 +175,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         socket_name
     }
 
-    fn get_size_and_point(&mut self) -> Option<(i32, i32, i32, i32)> {
+    fn get_surface_size_and_point(&mut self) -> Option<(WlSurface, i32, i32, i32, i32)> {
         let Some(window) = self.space.elements().find(|w| {
             w.toplevel()
                 .current_state()
@@ -201,7 +202,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         });
         surface.send_pending_configure();
 
-        Some((x, y, width, height))
+        Some((surface.wl_surface().clone(), x, y, width, height))
     }
 
     pub fn surface_under_pointer(
@@ -250,9 +251,8 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
     }
 
     fn handle_split_element(&mut self, surface: &WlSurface) {
-        self.reseize_state = PeddingResize::ResizeFinished(surface.clone());
-
-        let Some((x, y, width, height)) = self.get_size_and_point() else {
+        let Some((surface_before, x, y, width, height)) = self.get_surface_size_and_point() else {
+            self.reseize_state = PeddingResize::ResizeFinished(surface.clone());
             return;
         };
         let Some(window) = self
@@ -268,6 +268,9 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
             state.size = Some((width, height).into());
         });
         surface.send_pending_configure();
+        self.reseize_state =
+            PeddingResize::ResizeTwoWindowFinished((surface_before, surface.wl_surface().clone()));
+
         self.space.map_element(window.clone(), (x, y), true);
     }
 
@@ -313,6 +316,42 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         let pox_y = geo.size.h / 2 - gerwindow.size.h / 2;
         self.space
             .map_element(window.clone(), (pos_x, pox_y), false);
+    }
+
+    pub fn handle_resize_tile_split_window_finished(&mut self) {
+        let PeddingResize::ResizeTwoWindowFinished((ref surfacea, ref surfaceb)) =
+            self.reseize_state
+        else {
+            return;
+        };
+        if self.wmstatus != WmStatus::Tile {
+            return;
+        }
+        let Some(windowa) = self
+            .space
+            .elements()
+            .find(|w| w.toplevel().wl_surface() == surfacea)
+        else {
+            return;
+        };
+        let Some(windowb) = self
+            .space
+            .elements()
+            .find(|w| w.toplevel().wl_surface() == surfaceb)
+        else {
+            return;
+        };
+        let surfacea = windowa.toplevel();
+        surfacea.with_pending_state(|state| {
+            state.states.unset(xdg_toplevel::State::Resizing);
+        });
+
+        let surfaceb = windowb.toplevel();
+        surfaceb.with_pending_state(|state| {
+            state.states.unset(xdg_toplevel::State::Resizing);
+        });
+        surfaceb.send_configure();
+        self.reseize_state = PeddingResize::Stop;
     }
 
     pub fn handle_resize_tile_window_finished(&mut self) {
