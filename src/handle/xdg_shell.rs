@@ -22,7 +22,7 @@ use smithay::{
 use crate::{
     grab::move_grab::MoveSurfaceGrab,
     shell::WindowElement,
-    state::{Backend, PeddingResize},
+    state::{Backend, PeddingResize, WmStatus},
     FlyJa,
 };
 
@@ -42,14 +42,9 @@ impl<BackendData: Backend> XdgShellHandler for FlyJa<BackendData> {
     ) {
         // TODO:
     }
+
     fn new_toplevel(&mut self, surface: smithay::wayland::shell::xdg::ToplevelSurface) {
         let window = WindowElement::new(surface);
-        //let position = match self.wmstatus {
-        //    WmStatus::Stack | WmStatus::TiteToStack => {
-        //        self.pointer.current_location().to_i32_round()
-        //    }
-        //    _ => (0, 0).into(),
-        //};
         self.space.map_element(window.clone(), (0, 0), true);
         self.reseize_state = PeddingResize::ReadyToResize;
     }
@@ -72,6 +67,9 @@ impl<BackendData: Backend> XdgShellHandler for FlyJa<BackendData> {
     }
 
     fn move_request(&mut self, surface: ToplevelSurface, seat: wl_seat::WlSeat, serial: Serial) {
+        if self.wmstatus == WmStatus::Tile {
+            return;
+        }
         let seat: Seat<FlyJa<BackendData>> = Seat::from_resource(&seat).unwrap();
         let wl_surface = surface.wl_surface();
         let Some(start_data) = check_grab(&seat, wl_surface, serial) else {
