@@ -36,7 +36,6 @@ pub enum WmStatus {
 
 #[derive(Debug, Default)]
 pub enum PeddingResize {
-    ReadyToResize,
     Resizing(WlSurface),
     ResizeFinished(WlSurface),
     ResizeTwoWindowFinished((WlSurface, WlSurface)),
@@ -44,7 +43,7 @@ pub enum PeddingResize {
     Stop,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy)]
 pub enum SplitState {
     #[default]
     H,
@@ -182,6 +181,29 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
             )
             .unwrap();
         socket_name
+    }
+
+    pub fn set_split_state(&mut self, state: SplitState) {
+        self.splitstate = state;
+        let Some(window) = self.space.elements().find(|w| {
+            w.toplevel()
+                .current_state()
+                .states
+                .contains(xdg_toplevel::State::Activated)
+        }) else {
+            return;
+        };
+        let surface = window.toplevel();
+
+        let xdg_state = match state {
+            SplitState::H => xdg_toplevel::State::TiledRight,
+            SplitState::V => xdg_toplevel::State::TiledBottom,
+        };
+
+        surface.with_pending_state(|state| {
+            state.states.set(xdg_state);
+        });
+        surface.send_pending_configure();
     }
 
     fn get_surface_size_and_point(&mut self) -> Option<(WlSurface, i32, i32, i32, i32)> {

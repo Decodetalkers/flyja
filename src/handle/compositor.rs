@@ -13,7 +13,7 @@ use smithay::{
 };
 
 use crate::{
-    state::{Backend, ClientState, PeddingResize, WmStatus},
+    state::{Backend, ClientState, WmStatus},
     FlyJa,
 };
 
@@ -57,16 +57,6 @@ impl<BackendData: Backend> CompositorHandler for FlyJa<BackendData> {
             self.handle_resize_tile_window_finished();
             self.handle_resize_tile_split_window_finished();
         }
-
-        if let PeddingResize::ReadyToResize = self.reseize_state {
-            self.reseize_state = PeddingResize::Resizing(surface.clone());
-        }
-
-        //if let PeddingResize::Resizing(ref surface) = self.reseize_state {
-        //    if self.wmstatus == WmStatus::Stack {
-        //        self.reseize_state = PeddingResize::ResizeFinished(surface.clone());
-        //    }
-        //}
     }
 }
 

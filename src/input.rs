@@ -60,7 +60,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
                     self.wmstatus.status_change();
                 }
                 KeyAction::ChangeSplitSate(state) => {
-                    self.splitstate = state;
+                    self.set_split_state(state);
                 }
                 _ => {}
             },
