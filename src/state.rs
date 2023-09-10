@@ -51,7 +51,6 @@ pub enum WindowRemoved {
         pos_start: (i32, i32),
         pos_end: (i32, i32),
     },
-    PeddingResizeFinished(WlSurface),
     PeddingMutiResizeFinished(Vec<WlSurface>),
 }
 
@@ -576,25 +575,6 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         self.reseize_state = PeddingResize::Stop;
     }
 
-    pub fn handle_window_removed_finished(&mut self) {
-        let WindowRemoved::PeddingResizeFinished(ref surface) = self.window_remove_state else {
-            return;
-        };
-        let Some(window) = self
-            .space
-            .elements()
-            .find(|w| w.toplevel().wl_surface() == surface)
-        else {
-            return;
-        };
-        let surface = window.toplevel();
-        surface.with_pending_state(|state| {
-            state.states.unset(xdg_toplevel::State::Resizing);
-        });
-        surface.send_configure();
-        self.window_remove_state = WindowRemoved::NoState;
-    }
-
     pub fn handle_window_removed_mul(&mut self) {
         let WindowRemoved::Region { pos_start, pos_end } = self.window_remove_state else {
             return;
@@ -659,83 +639,6 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
             surface.send_configure();
         }
         self.window_remove_state = WindowRemoved::NoState;
-    }
-    pub fn handle_window_removed(&mut self) {
-        let WindowRemoved::Region { pos_start, pos_end } = self.window_remove_state else {
-            return;
-        };
-        let mut window: Option<WindowElement> = None;
-        if let Some(window_a) = self
-            .space
-            .elements()
-            .find(|window| window.is_to_resize_v_down(pos_start, pos_end, &self.space))
-        {
-            let Size { w, h, .. } = window_a.geometry().size;
-            let height_add = pos_end.1 - pos_start.1;
-            let surface = window_a.toplevel();
-            surface.with_pending_state(|state| {
-                state.states.set(xdg_toplevel::State::Resizing);
-                state.size = Some((w, h + height_add).into());
-            });
-            surface.send_pending_configure();
-            self.window_remove_state =
-                WindowRemoved::PeddingResizeFinished(surface.wl_surface().clone());
-            return;
-        }
-
-        if let Some(window_a) = self
-            .space
-            .elements()
-            .find(|window| window.is_to_resize_h_left(pos_start, pos_end, &self.space))
-        {
-            let Size { w, h, .. } = window_a.geometry().size;
-            let width_add = pos_end.0 - pos_start.0;
-            let surface = window_a.toplevel();
-            surface.with_pending_state(|state| {
-                state.states.set(xdg_toplevel::State::Resizing);
-                state.size = Some((w + width_add, h).into());
-            });
-            surface.send_pending_configure();
-            self.window_remove_state =
-                WindowRemoved::PeddingResizeFinished(surface.wl_surface().clone());
-            return;
-        }
-
-        if let Some(window_a) = self
-            .space
-            .elements()
-            .find(|window| window.is_to_resize_v_top(pos_start, pos_end, &self.space))
-        {
-            window = Some(window_a.clone());
-            let Size { w, h, .. } = window_a.geometry().size;
-            let height_add = pos_end.1 - pos_start.1;
-            let surface = window_a.toplevel();
-            surface.with_pending_state(|state| {
-                state.states.set(xdg_toplevel::State::Resizing);
-                state.size = Some((w, h + height_add).into());
-            });
-            surface.send_pending_configure();
-            self.window_remove_state =
-                WindowRemoved::PeddingResizeFinished(surface.wl_surface().clone());
-        } else if let Some(window_a) = self
-            .space
-            .elements()
-            .find(|window| window.is_to_resize_h_right(pos_start, pos_end, &self.space))
-        {
-            window = Some(window_a.clone());
-            let Size { w, h, .. } = window_a.geometry().size;
-            let width_add = pos_end.0 - pos_start.0;
-            let surface = window_a.toplevel();
-            surface.with_pending_state(|state| {
-                state.states.set(xdg_toplevel::State::Resizing);
-                state.size = Some((w + width_add, h).into());
-            });
-            self.window_remove_state =
-                WindowRemoved::PeddingResizeFinished(surface.wl_surface().clone());
-        }
-        if let Some(window) = window {
-            self.space.map_element(window, pos_start, true);
-        }
     }
 
     pub fn publish_commit(&self) {
