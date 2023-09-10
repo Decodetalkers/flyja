@@ -294,10 +294,6 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         }
     }
 
-    pub fn get_element_count(&self) -> usize {
-        self.space.elements().count()
-    }
-
     fn init_wayland_listener<T>(
         display: &mut Display<FlyJa<BackendData>>,
         event_loop: &mut EventLoop<CalloopData<T>>,
@@ -486,6 +482,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
     }
 
     // FIXME: I do not know when I can get the geometry
+    #[allow(unused)]
     pub fn handle_place_stack_to_center(&mut self) {
         let PeddingResize::ResizeFinished(ref surface) = self.reseize_state else {
             return;
@@ -641,6 +638,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         self.window_remove_state = WindowRemoved::NoState;
     }
 
+    #[allow(unused)]
     pub fn publish_commit(&self) {
         let Some(window) = self.space.elements().next() else {
             return;

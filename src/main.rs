@@ -9,7 +9,7 @@ mod udev;
 
 mod winit;
 
-pub use state::FlyJa;
+use state::FlyJa;
 
 use smithay::reexports::wayland_server::Display;
 
