@@ -44,8 +44,8 @@ impl<BackendData: Backend> CompositorHandler for FlyJa<BackendData> {
 
         self.handle_commit(surface);
 
-        self.handle_window_removed();
-        self.handle_window_removed_finished();
+        self.handle_window_removed_mul();
+        self.handle_window_mul_removed_finished();
 
         // TODO: need know the geo before put it to center
         // if self.wmstatus == WmStatus::Stack {
