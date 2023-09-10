@@ -97,6 +97,148 @@ pub struct FlyJa<BackendData: Backend + 'static> {
 }
 
 impl<BackendData: Backend + 'static> FlyJa<BackendData> {
+    pub fn find_to_resize_v_down(
+        &self,
+        (start_x, start_y): (i32, i32),
+        (end_x, end_y): (i32, i32),
+    ) -> Vec<WlSurface> {
+        let mut output = Vec::new();
+        let Some(window) = self.space.elements().find(|w| {
+            let Some(Point { x, y, .. }) = self.space.element_location(w) else {
+                return false;
+            };
+            let Size { w, h, .. } = w.geometry().size;
+            x == start_x && y + h == end_y && x + w <= end_x
+        }) else {
+            return output;
+        };
+        let Some(Point { x, .. }) = self.space.element_location(window) else {
+            return output;
+        };
+        let Size { w, .. } = window.geometry().size;
+        output.push(window.toplevel().wl_surface().clone());
+        if x + w == end_x {
+            return output;
+        }
+
+        let mut others = self.find_to_resize_v_down((start_x + w, start_y), (end_x, end_y));
+
+        if others.is_empty() {
+            return Vec::new();
+        }
+
+        output.append(&mut others);
+
+        output
+    }
+
+    pub fn find_to_resize_v_top(
+        &self,
+        (start_x, start_y): (i32, i32),
+        (end_x, end_y): (i32, i32),
+    ) -> Vec<WlSurface> {
+        let mut output = Vec::new();
+        let Some(window) = self.space.elements().find(|w| {
+            let Some(Point { x, y, .. }) = self.space.element_location(w) else {
+                return false;
+            };
+            let Size { w, .. } = w.geometry().size;
+            x == start_x && y == end_y && x + w <= end_x
+        }) else {
+            return output;
+        };
+        let Some(Point { x, .. }) = self.space.element_location(window) else {
+            return output;
+        };
+        let Size { w, .. } = window.geometry().size;
+        output.push(window.toplevel().wl_surface().clone());
+        if x + w == end_x {
+            return output;
+        }
+
+        let mut others = self.find_to_resize_v_top((start_x + w, start_y), (end_x, end_y));
+
+        if others.is_empty() {
+            return Vec::new();
+        }
+
+        output.append(&mut others);
+
+        output
+    }
+
+    pub fn find_to_resize_h_right(
+        &self,
+        (start_x, start_y): (i32, i32),
+        (end_x, end_y): (i32, i32),
+    ) -> Vec<WlSurface> {
+        let mut output = Vec::new();
+        let Some(window) = self.space.elements().find(|window| {
+            let Some(Point { x, y, .. }) = self.space.element_location(window) else {
+                return false;
+            };
+            let Size { w, h, .. } = window.geometry().size;
+            x + w == end_x && y == start_y && y + h <= end_y
+        }) else {
+            return output;
+        };
+        let Some(Point { y, .. }) = self.space.element_location(window) else {
+            return output;
+        };
+        let Size { h, .. } = window.geometry().size;
+        output.push(window.toplevel().wl_surface().clone());
+        if y + h == end_y {
+            return output;
+        }
+
+        let mut others = self.find_to_resize_h_right((start_x, start_y + h), (end_x, end_y));
+
+        if others.is_empty() {
+            return Vec::new();
+        }
+
+        output.append(&mut others);
+
+        output
+    }
+
+    pub fn find_to_resize_h_left(
+        &self,
+        (start_x, start_y): (i32, i32),
+        (end_x, end_y): (i32, i32),
+    ) -> Vec<WlSurface> {
+        let mut output = Vec::new();
+        let Some(window) = self.space.elements().find(|window| {
+            let Some(Point { x, y, .. }) = self.space.element_location(window) else {
+                return false;
+            };
+            let Size { h, .. } = window.geometry().size;
+            x == end_x && y == start_y && y + h <= end_y
+        }) else {
+            return output;
+        };
+        let Some(Point { y, .. }) = self.space.element_location(window) else {
+            return output;
+        };
+        let Size { h, .. } = window.geometry().size;
+        output.push(window.toplevel().wl_surface().clone());
+        if y + h == end_y {
+            return output;
+        }
+
+        let mut others = self.find_to_resize_h_left((start_x, start_y + h), (end_x, end_y));
+
+        if others.is_empty() {
+            return Vec::new();
+        }
+
+        output.append(&mut others);
+
+        output
+    }
+}
+
+impl<BackendData: Backend + 'static> FlyJa<BackendData> {
     pub fn init(
         backend_data: BackendData,
         event_loop: &mut EventLoop<CalloopData<BackendData>>,
@@ -469,6 +611,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
                 state.states.set(xdg_toplevel::State::Resizing);
                 state.size = Some((w, h + height_add).into());
             });
+            surface.send_pending_configure();
             self.window_remove_state =
                 WindowRemoved::PeddingResizeFinished(surface.wl_surface().clone());
             return;
@@ -486,6 +629,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
                 state.states.set(xdg_toplevel::State::Resizing);
                 state.size = Some((w + width_add, h).into());
             });
+            surface.send_pending_configure();
             self.window_remove_state =
                 WindowRemoved::PeddingResizeFinished(surface.wl_surface().clone());
             return;
@@ -504,6 +648,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
                 state.states.set(xdg_toplevel::State::Resizing);
                 state.size = Some((w, h + height_add).into());
             });
+            surface.send_pending_configure();
             self.window_remove_state =
                 WindowRemoved::PeddingResizeFinished(surface.wl_surface().clone());
         } else if let Some(window_a) = self
