@@ -30,32 +30,43 @@ use crate::{shell::WindowElement, CalloopData};
 #[derive(Debug, Default, PartialEq, Eq)]
 pub enum WmStatus {
     Tile,
-    TiteToStack,
     #[default]
     Stack,
-    StackToTite,
 }
 
 #[derive(Debug, Default)]
 pub enum PeddingResize {
-    ReadyToResize,
     Resizing(WlSurface),
     ResizeFinished(WlSurface),
+    ResizeTwoWindowFinished((WlSurface, WlSurface)),
     #[default]
     Stop,
+}
+
+#[derive(Debug, Default)]
+pub enum WindowRemoved {
+    #[default]
+    NoState,
+    Region {
+        pos_start: (i32, i32),
+        pos_end: (i32, i32),
+    },
+    PeddingMutiResizeFinished(Vec<WlSurface>),
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+pub enum SplitState {
+    #[default]
+    H,
+    V,
 }
 
 impl WmStatus {
     pub fn status_change(&mut self) {
         match self {
-            WmStatus::Tile => *self = WmStatus::TiteToStack,
-            WmStatus::TiteToStack => *self = WmStatus::Stack,
-            WmStatus::Stack => *self = WmStatus::StackToTite,
-            WmStatus::StackToTite => *self = WmStatus::Tile,
+            WmStatus::Tile => *self = WmStatus::Stack,
+            WmStatus::Stack => *self = WmStatus::Tile,
         }
-    }
-    pub fn is_changing(&self) -> bool {
-        matches!(self, WmStatus::StackToTite | WmStatus::TiteToStack)
     }
 }
 
@@ -81,6 +92,150 @@ pub struct FlyJa<BackendData: Backend + 'static> {
 
     pub reseize_state: PeddingResize,
     pub wmstatus: WmStatus,
+    pub splitstate: SplitState,
+    pub window_remove_state: WindowRemoved,
+}
+
+impl<BackendData: Backend + 'static> FlyJa<BackendData> {
+    pub fn find_to_resize_v_down(
+        &self,
+        (start_x, start_y): (i32, i32),
+        (end_x, end_y): (i32, i32),
+    ) -> Vec<((i32, i32), WindowElement)> {
+        let mut output = Vec::new();
+        let Some(window) = self.space.elements().find(|w| {
+            let Some(Point { x, y, .. }) = self.space.element_location(w) else {
+                return false;
+            };
+            let Size { w, h, .. } = w.geometry().size;
+            x == start_x && y + h == start_y && x + w <= end_x
+        }) else {
+            return output;
+        };
+        let Some(Point { x, y, .. }) = self.space.element_location(window) else {
+            return output;
+        };
+        let Size { w, .. } = window.geometry().size;
+        output.push(((x, y), window.clone()));
+        if x + w == end_x {
+            return output;
+        }
+
+        let mut others = self.find_to_resize_v_down((start_x + w, start_y), (end_x, end_y));
+
+        if others.is_empty() {
+            return Vec::new();
+        }
+
+        output.append(&mut others);
+
+        output
+    }
+
+    pub fn find_to_resize_v_top(
+        &self,
+        (start_x, start_y): (i32, i32),
+        (end_x, end_y): (i32, i32),
+    ) -> Vec<((i32, i32), WindowElement)> {
+        let mut output = Vec::new();
+        let Some(window) = self.space.elements().find(|w| {
+            let Some(Point { x, y, .. }) = self.space.element_location(w) else {
+                return false;
+            };
+            let Size { w, .. } = w.geometry().size;
+            x == start_x && y == end_y && x + w <= end_x
+        }) else {
+            return output;
+        };
+        let Some(Point { x, .. }) = self.space.element_location(window) else {
+            return output;
+        };
+        let Size { w, .. } = window.geometry().size;
+        output.push(((start_x, start_y), window.clone()));
+        if x + w == end_x {
+            return output;
+        }
+
+        let mut others = self.find_to_resize_v_top((start_x + w, start_y), (end_x, end_y));
+
+        if others.is_empty() {
+            return Vec::new();
+        }
+
+        output.append(&mut others);
+
+        output
+    }
+
+    pub fn find_to_resize_h_right(
+        &self,
+        (start_x, start_y): (i32, i32),
+        (end_x, end_y): (i32, i32),
+    ) -> Vec<((i32, i32), WindowElement)> {
+        let mut output = Vec::new();
+        let Some(window) = self.space.elements().find(|window| {
+            let Some(Point { x, y, .. }) = self.space.element_location(window) else {
+                return false;
+            };
+            let Size { w, h, .. } = window.geometry().size;
+            x + w == start_x && y == start_y && y + h <= end_y
+        }) else {
+            return output;
+        };
+        let Some(Point { y, x, .. }) = self.space.element_location(window) else {
+            return output;
+        };
+        let Size { h, .. } = window.geometry().size;
+        output.push(((x, start_y), window.clone()));
+        if y + h == end_y {
+            return output;
+        }
+
+        let mut others = self.find_to_resize_h_right((start_x, start_y + h), (end_x, end_y));
+
+        if others.is_empty() {
+            return Vec::new();
+        }
+
+        output.append(&mut others);
+
+        output
+    }
+
+    pub fn find_to_resize_h_left(
+        &self,
+        (start_x, start_y): (i32, i32),
+        (end_x, end_y): (i32, i32),
+    ) -> Vec<((i32, i32), WindowElement)> {
+        let mut output = Vec::new();
+        let Some(window) = self.space.elements().find(|window| {
+            let Some(Point { x, y, .. }) = self.space.element_location(window) else {
+                return false;
+            };
+            let Size { h, .. } = window.geometry().size;
+            x == end_x && y == start_y && y + h <= end_y
+        }) else {
+            return output;
+        };
+        let Some(Point { y, .. }) = self.space.element_location(window) else {
+            return output;
+        };
+        let Size { h, .. } = window.geometry().size;
+        output.push(((start_x, start_y), window.clone()));
+        if y + h == end_y {
+            return output;
+        }
+
+        let mut others = self.find_to_resize_h_left((start_x, start_y + h), (end_x, end_y));
+
+        if others.is_empty() {
+            return Vec::new();
+        }
+
+        output.append(&mut others);
+
+        output
+    }
 }
 
 impl<BackendData: Backend + 'static> FlyJa<BackendData> {
@@ -133,7 +288,9 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
             seat_name,
 
             reseize_state: PeddingResize::Stop,
-            wmstatus: WmStatus::Stack,
+            wmstatus: WmStatus::Tile,
+            splitstate: SplitState::H,
+            window_remove_state: WindowRemoved::NoState,
         }
     }
 
@@ -181,6 +338,72 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         socket_name
     }
 
+    pub fn set_split_state(&mut self, state: SplitState) {
+        self.splitstate = state;
+        let Some(window) = self.space.elements().find(|w| {
+            w.toplevel()
+                .current_state()
+                .states
+                .contains(xdg_toplevel::State::Activated)
+        }) else {
+            return;
+        };
+        let surface = window.toplevel();
+
+        let xdg_state = match state {
+            SplitState::H => xdg_toplevel::State::TiledRight,
+            SplitState::V => xdg_toplevel::State::TiledBottom,
+        };
+
+        surface.with_pending_state(|state| {
+            state.states.set(xdg_state);
+        });
+        surface.send_pending_configure();
+    }
+
+    fn get_surface_size_and_point(&mut self) -> Option<(WlSurface, i32, i32, i32, i32)> {
+        let Some(window) = self.space.elements().find(|w| {
+            w.toplevel()
+                .current_state()
+                .states
+                .contains(xdg_toplevel::State::Activated)
+        }) else {
+            return None;
+        };
+
+        let geometry = window.geometry();
+
+        let Some(Point { x, y, .. }) = self.space.element_location(window) else {
+            return None;
+        };
+
+        let (x, y, width, height) = match self.splitstate {
+            SplitState::H => {
+                let x = x + geometry.size.w / 2;
+
+                let width = geometry.size.w / 2;
+                let height = geometry.size.h;
+                (x, y, width, height)
+            }
+            SplitState::V => {
+                let y = y + geometry.size.h / 2;
+
+                let width = geometry.size.w;
+                let height = geometry.size.h / 2;
+                (x, y, width, height)
+            }
+        };
+        let surface = window.toplevel();
+
+        surface.with_pending_state(|state| {
+            state.states.set(xdg_toplevel::State::Resizing);
+            state.size = Some((width, height).into());
+        });
+        surface.send_pending_configure();
+
+        Some((surface.wl_surface().clone(), x, y, width, height))
+    }
+
     pub fn surface_under_pointer(
         &self,
         pointer: &PointerHandle<Self>,
@@ -195,8 +418,40 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
             })
     }
 
-    pub fn handle_resize_tile_window_changing(&mut self) {
-        let PeddingResize::Resizing(ref surface) = self.reseize_state else {
+    fn handle_one_element(&mut self, surface: &WlSurface) {
+        self.reseize_state = PeddingResize::ResizeFinished(surface.clone());
+        let Some(window) = self
+            .space
+            .elements()
+            .find(|w| w.toplevel().wl_surface() == surface)
+        else {
+            return;
+        };
+        let prosize = {
+            let Some(output) = self
+                .space
+                .output_under(self.pointer.current_location())
+                .next()
+            else {
+                return;
+            };
+            let Some(geo) = self.space.output_geometry(output) else {
+                return;
+            };
+            geo.size
+        };
+        let surface_top = window.toplevel();
+        surface_top.with_pending_state(|state| {
+            state.states.set(xdg_toplevel::State::Resizing);
+            let size = prosize;
+            state.size = Some(size);
+        });
+        surface_top.send_configure();
+    }
+
+    fn handle_split_element(&mut self, surface: &WlSurface) {
+        let Some((surface_before, x, y, width, height)) = self.get_surface_size_and_point() else {
+            self.reseize_state = PeddingResize::ResizeFinished(surface.clone());
             return;
         };
         let Some(window) = self
@@ -206,23 +461,36 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         else {
             return;
         };
-        let surface_top = window.toplevel();
-        surface_top.with_pending_state(|state| {
+        let surface = window.toplevel();
+        surface.with_pending_state(|state| {
             state.states.set(xdg_toplevel::State::Resizing);
-            let size = Size::from((1000, 1000));
-            state.size = Some(size);
+            state.size = Some((width, height).into());
         });
-        surface_top.send_configure();
-        self.reseize_state = PeddingResize::ResizeFinished(surface.clone());
+        surface.send_pending_configure();
+        self.reseize_state =
+            PeddingResize::ResizeTwoWindowFinished((surface_before, surface.wl_surface().clone()));
+
+        self.space.map_element(window.clone(), (x, y), true);
     }
 
-    pub fn handle_place_stack_to_center(&mut self) {
-        if self.wmstatus != WmStatus::Stack {
+    pub fn handle_resize_tile_window_changing(&mut self) {
+        let PeddingResize::Resizing(ref surface) = self.reseize_state else {
             return;
+        };
+        let count = self.space.elements().count();
+        if count == 1 {
+            self.handle_one_element(&surface.clone());
+        } else {
+            self.handle_split_element(&surface.clone());
         }
+    }
+
+    // FIXME: I do not know when I can get the geometry
+    pub fn handle_place_stack_to_center(&mut self) {
         let PeddingResize::ResizeFinished(ref surface) = self.reseize_state else {
             return;
         };
+
         let Some(output) = self
             .space
             .output_under(self.pointer.current_location())
@@ -246,6 +514,43 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         let pox_y = geo.size.h / 2 - gerwindow.size.h / 2;
         self.space
             .map_element(window.clone(), (pos_x, pox_y), false);
+        self.reseize_state = PeddingResize::Stop;
+    }
+
+    pub fn handle_resize_tile_split_window_finished(&mut self) {
+        let PeddingResize::ResizeTwoWindowFinished((ref surfacea, ref surfaceb)) =
+            self.reseize_state
+        else {
+            return;
+        };
+        if self.wmstatus != WmStatus::Tile {
+            return;
+        }
+        let Some(windowa) = self
+            .space
+            .elements()
+            .find(|w| w.toplevel().wl_surface() == surfacea)
+        else {
+            return;
+        };
+        let Some(windowb) = self
+            .space
+            .elements()
+            .find(|w| w.toplevel().wl_surface() == surfaceb)
+        else {
+            return;
+        };
+        let surfacea = windowa.toplevel();
+        surfacea.with_pending_state(|state| {
+            state.states.unset(xdg_toplevel::State::Resizing);
+        });
+
+        let surfaceb = windowb.toplevel();
+        surfaceb.with_pending_state(|state| {
+            state.states.unset(xdg_toplevel::State::Resizing);
+        });
+        surfaceb.send_configure();
+        self.reseize_state = PeddingResize::Stop;
     }
 
     pub fn handle_resize_tile_window_finished(&mut self) {
@@ -270,17 +575,70 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         self.reseize_state = PeddingResize::Stop;
     }
 
-    pub fn handle_state_change_event(&mut self) {
-        if !self.wmstatus.is_changing() {
+    pub fn handle_window_removed_mul(&mut self) {
+        let WindowRemoved::Region { pos_start, pos_end } = self.window_remove_state else {
             return;
+        };
+        let (elements_and_poss, state) = 'surface: {
+            let surfacesa = self.find_to_resize_v_down(pos_start, pos_end);
+            if !surfacesa.is_empty() {
+                break 'surface (surfacesa, 0);
+            }
+            let surfaceb = self.find_to_resize_v_top(pos_start, pos_end);
+            if !surfaceb.is_empty() {
+                break 'surface (surfaceb, 1);
+            }
+            let surfacec = self.find_to_resize_h_left(pos_start, pos_end);
+            if !surfacec.is_empty() {
+                break 'surface (surfacec, 2);
+            }
+            (self.find_to_resize_h_right(pos_start, pos_end), 3)
+        };
+        for ((start_x, start_y), window) in elements_and_poss.iter() {
+            let Size { w, h, .. } = window.geometry().size;
+            let height_add = pos_end.1 - pos_start.1;
+            let width_add = pos_end.0 - pos_start.0;
+            let surface = window.toplevel();
+            let size = match state {
+                0 | 1 => (w, h + height_add).into(),
+                2 | 3 => (w + width_add, h).into(),
+                _ => unreachable!(),
+            };
+            surface.with_pending_state(|state| {
+                state.states.set(xdg_toplevel::State::Resizing);
+                state.size = Some(size);
+            });
+            surface.send_pending_configure();
+            self.space
+                .map_element(window.clone(), (*start_x, *start_y), true);
         }
+        let surfaces: Vec<WlSurface> = elements_and_poss
+            .iter()
+            .map(|e| e.1.toplevel().wl_surface().clone())
+            .collect();
+        self.window_remove_state = WindowRemoved::PeddingMutiResizeFinished(surfaces);
+    }
 
-        self.wmstatus.status_change();
-        let elements: Vec<_> = self.space.elements().cloned().collect();
-        for element in elements {
-            // TODO: clone element and storage data
-            self.space.map_element(element, (0, 0), false);
+    pub fn handle_window_mul_removed_finished(&mut self) {
+        let WindowRemoved::PeddingMutiResizeFinished(ref surfaces) = self.window_remove_state
+        else {
+            return;
+        };
+        for surface in surfaces {
+            let Some(window) = self
+                .space
+                .elements()
+                .find(|w| w.toplevel().wl_surface() == surface)
+            else {
+                return;
+            };
+            let surface = window.toplevel();
+            surface.with_pending_state(|state| {
+                state.states.unset(xdg_toplevel::State::Resizing);
+            });
+            surface.send_configure();
         }
+        self.window_remove_state = WindowRemoved::NoState;
     }
 
     pub fn publish_commit(&self) {

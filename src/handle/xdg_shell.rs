@@ -1,6 +1,5 @@
 use smithay::{
     delegate_xdg_shell,
-    desktop::Space,
     input::{
         pointer::{Focus, GrabStartData},
         Seat,
@@ -12,7 +11,7 @@ use smithay::{
             Resource,
         },
     },
-    utils::Serial,
+    utils::{Point, Serial, Size},
     wayland::{
         compositor::with_states,
         shell::xdg::{Configure, ToplevelSurface, XdgShellHandler, XdgToplevelSurfaceData},
@@ -22,7 +21,7 @@ use smithay::{
 use crate::{
     grab::move_grab::MoveSurfaceGrab,
     shell::WindowElement,
-    state::{Backend, PeddingResize},
+    state::{Backend, PeddingResize, WindowRemoved, WmStatus},
     FlyJa,
 };
 
@@ -42,19 +41,33 @@ impl<BackendData: Backend> XdgShellHandler for FlyJa<BackendData> {
     ) {
         // TODO:
     }
-    fn new_toplevel(&mut self, surface: smithay::wayland::shell::xdg::ToplevelSurface) {
-        let window = WindowElement::new(surface);
-        //let position = match self.wmstatus {
-        //    WmStatus::Stack | WmStatus::TiteToStack => {
-        //        self.pointer.current_location().to_i32_round()
-        //    }
-        //    _ => (0, 0).into(),
-        //};
-        self.space.map_element(window.clone(), (0, 0), false);
-        self.reseize_state = PeddingResize::ReadyToResize;
+
+    fn new_toplevel(&mut self, surface: ToplevelSurface) {
+        let window = WindowElement::new(surface.clone());
+        self.space.map_element(window.clone(), (0, 0), true);
+        self.reseize_state = PeddingResize::Resizing(surface.wl_surface().clone());
     }
 
-    fn toplevel_destroyed(&mut self, _surface: smithay::wayland::shell::xdg::ToplevelSurface) {
+    fn toplevel_destroyed(&mut self, surface: ToplevelSurface) {
+        let Some(window) = self
+            .space
+            .elements()
+            .find(|w| w.toplevel().wl_surface() == surface.wl_surface())
+        else {
+            return;
+        };
+        let Some(Point { x, y, .. }) = self.space.element_location(window) else {
+            return;
+        };
+        let Size {
+            w: width,
+            h: height,
+            ..
+        } = window.geometry().size;
+        self.window_remove_state = WindowRemoved::Region {
+            pos_start: (x, y),
+            pos_end: (x + width, y + height),
+        };
         // TODO: resize again
     }
 
@@ -72,6 +85,9 @@ impl<BackendData: Backend> XdgShellHandler for FlyJa<BackendData> {
     }
 
     fn move_request(&mut self, surface: ToplevelSurface, seat: wl_seat::WlSeat, serial: Serial) {
+        if self.wmstatus == WmStatus::Tile {
+            return;
+        }
         let seat: Seat<FlyJa<BackendData>> = Seat::from_resource(&seat).unwrap();
         let wl_surface = surface.wl_surface();
         let Some(start_data) = check_grab(&seat, wl_surface, serial) else {
@@ -96,37 +112,37 @@ impl<BackendData: Backend> XdgShellHandler for FlyJa<BackendData> {
         pointer.set_grab(self, grab, serial, Focus::Clear);
     }
 
-    fn ack_configure(&mut self, _surface: wl_surface::WlSurface, configure: Configure) {
-        if let Configure::Toplevel(configure) = configure {
-            println!("{:?}", configure.state);
+    fn ack_configure(&mut self, _surface: wl_surface::WlSurface, _configure: Configure) {}
+}
+
+impl<BackendData: Backend + 'static> FlyJa<BackendData> {
+    pub fn handle_commit(&mut self, surface: &wl_surface::WlSurface) -> Option<()> {
+        let window = self
+            .space
+            .elements()
+            .find(|w| w.toplevel().wl_surface() == surface)
+            .cloned()?;
+        let initial_configure_sent = with_states(surface, |states| {
+            states
+                .data_map
+                .get::<XdgToplevelSurfaceData>()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .initial_configure_sent
+        });
+
+        if !initial_configure_sent {
+            window.toplevel().send_configure();
+            if let WmStatus::Stack = self.wmstatus {
+                self.reseize_state = PeddingResize::ResizeFinished(surface.clone());
+            }
         }
+
+        Some(())
     }
 }
 
-pub fn handle_commit(
-    space: &mut Space<WindowElement>,
-    surface: &wl_surface::WlSurface,
-) -> Option<()> {
-    let window = space
-        .elements()
-        .find(|w| w.toplevel().wl_surface() == surface)
-        .cloned()?;
-    let initial_configure_sent = with_states(surface, |states| {
-        states
-            .data_map
-            .get::<XdgToplevelSurfaceData>()
-            .unwrap()
-            .lock()
-            .unwrap()
-            .initial_configure_sent
-    });
-
-    if !initial_configure_sent {
-        window.toplevel().send_configure();
-    }
-
-    Some(())
-}
 delegate_xdg_shell!(@<BackendData: Backend + 'static> FlyJa<BackendData>);
 
 fn check_grab<T>(

@@ -13,11 +13,9 @@ use smithay::{
 };
 
 use crate::{
-    state::{Backend, ClientState, PeddingResize},
+    state::{Backend, ClientState, WmStatus},
     FlyJa,
 };
-
-use super::xdg_shell;
 
 impl<BackendData: Backend> CompositorHandler for FlyJa<BackendData> {
     fn compositor_state(&mut self) -> &mut CompositorState {
@@ -44,19 +42,21 @@ impl<BackendData: Backend> CompositorHandler for FlyJa<BackendData> {
             }
         }
 
-        xdg_shell::handle_commit(&mut self.space, surface);
+        self.handle_commit(surface);
 
-        self.handle_state_change_event();
+        self.handle_window_removed_mul();
+        self.handle_window_mul_removed_finished();
 
-        // Stack
-        self.handle_place_stack_to_center();
+        // TODO: need know the geo before put it to center
+        // if self.wmstatus == WmStatus::Stack {
+        //     self.handle_place_stack_to_center();
+        // }
 
         // Tile
-        self.handle_resize_tile_window_changing();
-        self.handle_resize_tile_window_finished();
-
-        if let PeddingResize::ReadyToResize = self.reseize_state {
-            self.reseize_state = PeddingResize::Resizing(surface.clone());
+        if self.wmstatus == WmStatus::Tile {
+            self.handle_resize_tile_window_changing();
+            self.handle_resize_tile_window_finished();
+            self.handle_resize_tile_split_window_finished();
         }
     }
 }

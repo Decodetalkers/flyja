@@ -11,7 +11,10 @@ use smithay::{
     utils::SERIAL_COUNTER,
 };
 
-use crate::{state::Backend, FlyJa};
+use crate::{
+    state::{Backend, SplitState},
+    FlyJa,
+};
 
 /// Possible results of a keyboard action
 #[allow(dead_code)]
@@ -24,6 +27,7 @@ enum KeyAction {
     /// run a command
     Run(String),
     ChangeWmState,
+    ChangeSplitSate(SplitState),
     /// Switch the current screen
     Screen(usize),
     ScaleUp,
@@ -53,10 +57,10 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
                     }
                 }
                 KeyAction::ChangeWmState => {
-                    if !self.wmstatus.is_changing() {
-                        self.wmstatus.status_change();
-                        self.publish_commit();
-                    }
+                    self.wmstatus.status_change();
+                }
+                KeyAction::ChangeSplitSate(state) => {
+                    self.set_split_state(state);
                 }
                 _ => {}
             },
@@ -225,6 +229,10 @@ fn process_keyboard_shortcut(modifiers: ModifiersState, keysym: Keysym) -> Optio
         Some(KeyAction::RotateOutput)
     } else if modifiers.logo && modifiers.shift && keysym == xkb::KEY_T {
         Some(KeyAction::ToggleTint)
+    } else if modifiers.logo && keysym == xkb::KEY_v {
+        Some(KeyAction::ChangeSplitSate(SplitState::V))
+    } else if modifiers.logo && keysym == xkb::KEY_b {
+        Some(KeyAction::ChangeSplitSate(SplitState::H))
     } else {
         None
     }
