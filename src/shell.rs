@@ -33,7 +33,7 @@ impl WindowElement {
             resize_size: None,
             ..self.clone()
         };
-        let Some(position) = space.element_location(&self) else {
+        let Some(position) = space.element_location(self) else {
             return;
         };
         space.map_element(window, position, true);
