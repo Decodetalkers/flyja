@@ -59,15 +59,23 @@ impl<BackendData: Backend> XdgShellHandler for FlyJa<BackendData> {
         let Some(Point { x, y, .. }) = self.space.element_location(window) else {
             return;
         };
-        let Size {
-            w: width,
-            h: height,
-            ..
-        } = window.geometry().size;
+        let (x, y, newx, newy) = 'size: {
+            if let Some(((x, y), (newx, newy))) = window.resize_size {
+                break 'size (x, y, newx, newy);
+            }
+            let Size {
+                w: width,
+                h: height,
+                ..
+            } = window.geometry().size;
+            (x, y, x + width, y + height)
+        };
+
         self.window_remove_state = WindowRemoved::Region {
             pos_start: (x, y),
-            pos_end: (x + width, y + height),
+            pos_end: (newx, newy),
         };
+        self.handle_window_removed_mul();
         // TODO: resize again
     }
 

@@ -108,7 +108,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
                 return false;
             };
             let Size { w, h, .. } = w.geometry().size;
-            x == start_x && y + h == start_y && x + w <= end_x
+            (x - start_x).abs() < 5 && (y + h - start_y).abs() < 5 && x + w <= end_x + 5
         }) else {
             return output;
         };
@@ -117,7 +117,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         };
         let Size { w, .. } = window.geometry().size;
         output.push(((x, y), window.clone()));
-        if x + w == end_x {
+        if (x + w - end_x).abs() < 5 {
             return output;
         }
 
@@ -143,7 +143,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
                 return false;
             };
             let Size { w, .. } = w.geometry().size;
-            x == start_x && y == end_y && x + w <= end_x
+            (x - start_x).abs() < 5 && (y - end_y).abs() < 5 && x + w <= end_x + 5
         }) else {
             return output;
         };
@@ -152,7 +152,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         };
         let Size { w, .. } = window.geometry().size;
         output.push(((start_x, start_y), window.clone()));
-        if x + w == end_x {
+        if (x + w - end_x).abs() < 5 {
             return output;
         }
 
@@ -178,7 +178,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
                 return false;
             };
             let Size { w, h, .. } = window.geometry().size;
-            x + w == start_x && y == start_y && y + h <= end_y
+            (x + w - start_x).abs() < 5 && (y - start_y).abs() < 5 && y + h <= end_y + 5
         }) else {
             return output;
         };
@@ -187,7 +187,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         };
         let Size { h, .. } = window.geometry().size;
         output.push(((x, start_y), window.clone()));
-        if y + h == end_y {
+        if (y + h - end_y).abs() < 5 {
             return output;
         }
 
@@ -213,7 +213,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
                 return false;
             };
             let Size { h, .. } = window.geometry().size;
-            x == end_x && y == start_y && y + h <= end_y
+            (x - end_x).abs() < 5 && (y - start_y).abs() < 5 && y + h <= end_y + 5
         }) else {
             return output;
         };
@@ -222,7 +222,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         };
         let Size { h, .. } = window.geometry().size;
         output.push(((start_x, start_y), window.clone()));
-        if y + h == end_y {
+        if (y + h - end_y).abs() < 5 {
             return output;
         }
 
@@ -592,7 +592,8 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
             (self.find_to_resize_h_right(pos_start, pos_end), 3)
         };
         for ((start_x, start_y), window) in elements_and_poss.iter() {
-            let Size { w, h, .. } = window.geometry().size;
+            // FIXME:
+            let (w, h) = window.get_pedding_size();
             let height_add = pos_end.1 - pos_start.1;
             let width_add = pos_end.0 - pos_start.0;
             let surface = window.toplevel();
@@ -605,9 +606,10 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
                 state.states.set(xdg_toplevel::State::Resizing);
                 state.size = Some(size);
             });
-            surface.send_pending_configure();
+            let (new_end_x, new_end_y) = (start_x + size.w, start_y + size.h);
+            let newwindow = window.set_resize_size(((*start_x, *start_y), (new_end_x, new_end_y)));
             self.space
-                .map_element(window.clone(), (*start_x, *start_y), true);
+                .map_element(newwindow, (*start_x, *start_y), true);
         }
         let surfaces: Vec<WlSurface> = elements_and_poss
             .iter()
@@ -626,9 +628,14 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
                 .space
                 .elements()
                 .find(|w| w.toplevel().wl_surface() == surface)
+                .cloned()
             else {
                 return;
             };
+
+            if window.is_resize_finished(&self.space) {
+                window.remap_element(&mut self.space);
+            }
             let surface = window.toplevel();
             surface.with_pending_state(|state| {
                 state.states.unset(xdg_toplevel::State::Resizing);
@@ -643,7 +650,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         let Some(window) = self.space.elements().next() else {
             return;
         };
-        window.toplevel().send_pending_configure();
+        window.toplevel().send_configure();
     }
 }
 
