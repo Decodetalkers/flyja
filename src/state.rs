@@ -9,7 +9,7 @@ use smithay::{
         wayland_protocols::xdg::shell::server::xdg_toplevel,
         wayland_server::{backend::ClientData, protocol::wl_surface::WlSurface, Display},
     },
-    utils::{Logical, Point, Size},
+    utils::{Logical, Point},
     wayland::{
         compositor::{CompositorClientState, CompositorState},
         data_device::DataDeviceState,
@@ -115,7 +115,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         let Some(Point { x, y, .. }) = self.space.element_location(window) else {
             return output;
         };
-        let Size { w, .. } = window.geometry().size;
+        let (w, _) = window.get_pedding_size();
         output.push(((x, y), window.clone()));
         if (x + w - end_x).abs() < 5 {
             return output;
@@ -150,7 +150,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         let Some(Point { x, .. }) = self.space.element_location(window) else {
             return output;
         };
-        let Size { w, .. } = window.geometry().size;
+        let (w, _) = window.get_pedding_size();
         output.push(((start_x, start_y), window.clone()));
         if (x + w - end_x).abs() < 5 {
             return output;
@@ -185,7 +185,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         let Some(Point { y, x, .. }) = self.space.element_location(window) else {
             return output;
         };
-        let Size { h, .. } = window.geometry().size;
+        let (_, h) = window.get_pedding_size();
         output.push(((x, start_y), window.clone()));
         if (y + h - end_y).abs() < 5 {
             return output;
@@ -220,7 +220,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         let Some(Point { y, .. }) = self.space.element_location(window) else {
             return output;
         };
-        let Size { h, .. } = window.geometry().size;
+        let (_, h) = window.get_pedding_size();
         output.push(((start_x, start_y), window.clone()));
         if (y + h - end_y).abs() < 5 {
             return output;
