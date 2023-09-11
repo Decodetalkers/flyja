@@ -107,7 +107,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
             let Some(Point { x, y, .. }) = self.space.element_location(w) else {
                 return false;
             };
-            let Size { w, h, .. } = w.geometry().size;
+            let (w, h) = w.get_pedding_size();
             (x - start_x).abs() < 5 && (y + h - start_y).abs() < 5 && x + w <= end_x + 5
         }) else {
             return output;
@@ -142,7 +142,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
             let Some(Point { x, y, .. }) = self.space.element_location(w) else {
                 return false;
             };
-            let Size { w, .. } = w.geometry().size;
+            let (w, _) = w.get_pedding_size();
             (x - start_x).abs() < 5 && (y - end_y).abs() < 5 && x + w <= end_x + 5
         }) else {
             return output;
@@ -177,7 +177,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
             let Some(Point { x, y, .. }) = self.space.element_location(window) else {
                 return false;
             };
-            let Size { w, h, .. } = window.geometry().size;
+            let (w, h) = window.get_pedding_size();
             (x + w - start_x).abs() < 5 && (y - start_y).abs() < 5 && y + h <= end_y + 5
         }) else {
             return output;
@@ -212,7 +212,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
             let Some(Point { x, y, .. }) = self.space.element_location(window) else {
                 return false;
             };
-            let Size { h, .. } = window.geometry().size;
+            let (_, h) = window.get_pedding_size();
             (x - end_x).abs() < 5 && (y - start_y).abs() < 5 && y + h <= end_y + 5
         }) else {
             return output;
@@ -618,6 +618,23 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         self.window_remove_state = WindowRemoved::PeddingMutiResizeFinished(surfaces);
     }
 
+    pub fn handle_window_mul_removed_finished_check(&mut self) {
+        let WindowRemoved::NoState = self.window_remove_state else {
+            return;
+        };
+        let windows: Vec<WindowElement> = self
+            .space
+            .elements()
+            .filter(|w| w.is_resize_finished(&self.space))
+            .cloned()
+            .collect();
+        for window in windows {
+            if window.is_resize_finished(&self.space) {
+                window.remap_element(&mut self.space);
+            }
+        }
+    }
+
     pub fn handle_window_mul_removed_finished(&mut self) {
         let WindowRemoved::PeddingMutiResizeFinished(ref surfaces) = self.window_remove_state
         else {
@@ -633,9 +650,6 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
                 return;
             };
 
-            if window.is_resize_finished(&self.space) {
-                window.remap_element(&mut self.space);
-            }
             let surface = window.toplevel();
             surface.with_pending_state(|state| {
                 state.states.unset(xdg_toplevel::State::Resizing);

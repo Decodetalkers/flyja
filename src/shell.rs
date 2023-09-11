@@ -63,7 +63,7 @@ impl WindowElement {
 
     pub fn get_pedding_size(&self) -> (i32, i32) {
         if let Some(((start_x, start_y), (end_x, end_y))) = self.resize_size {
-            return (end_y - start_x, end_x - start_y);
+            return (end_x - start_x, end_y - start_y);
         }
         let Size { w, h, .. } = self.geometry().size;
         (w, h)

@@ -44,8 +44,6 @@ impl<BackendData: Backend> CompositorHandler for FlyJa<BackendData> {
 
         self.handle_commit(surface);
 
-        self.handle_window_mul_removed_finished();
-
         // TODO: need know the geo before put it to center
         // if self.wmstatus == WmStatus::Stack {
         //     self.handle_place_stack_to_center();
@@ -53,6 +51,8 @@ impl<BackendData: Backend> CompositorHandler for FlyJa<BackendData> {
 
         // Tile
         if self.wmstatus == WmStatus::Tile {
+            self.handle_window_mul_removed_finished();
+            self.handle_window_mul_removed_finished_check();
             self.handle_resize_tile_window_changing();
             self.handle_resize_tile_window_finished();
             self.handle_resize_tile_split_window_finished();
