@@ -606,6 +606,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
                 state.states.set(xdg_toplevel::State::Resizing);
                 state.size = Some(size);
             });
+            surface.send_pending_configure();
             let (new_end_x, new_end_y) = (start_x + size.w, start_y + size.h);
             let newwindow = window.set_resize_size(((*start_x, *start_y), (new_end_x, new_end_y)));
             self.space
