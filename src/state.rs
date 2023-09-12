@@ -1,7 +1,7 @@
 use std::{ffi::OsString, os::unix::io::AsRawFd, sync::Arc};
 
 use smithay::{
-    delegate_input_method_manager, delegate_text_input_manager,
+    delegate_input_method_manager, delegate_text_input_manager, delegate_xdg_activation,
     desktop::{PopupManager, Space, WindowSurfaceType},
     input::Seat,
     input::{pointer::PointerHandle, SeatState},
@@ -18,6 +18,9 @@ use smithay::{
         shell::xdg::XdgShellState,
         shm::ShmState,
         socket::ListeningSocketSource,
+        xdg_activation::{
+            XdgActivationHandler, XdgActivationState, XdgActivationToken, XdgActivationTokenData,
+        },
     },
 };
 
@@ -83,6 +86,7 @@ pub struct FlyJa<BackendData: Backend + 'static> {
     // State
     pub compositor_state: CompositorState,
     pub xdg_shell_state: XdgShellState,
+    pub xdg_activation_state: XdgActivationState,
     pub shm_state: ShmState,
     pub output_manager_state: OutputManagerState,
     pub seat_state: SeatState<FlyJa<BackendData>>,
@@ -281,6 +285,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
 
             compositor_state,
             xdg_shell_state,
+            xdg_activation_state: XdgActivationState::new::<Self>(&dh),
             shm_state,
             output_manager_state,
 
@@ -675,6 +680,44 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
 delegate_text_input_manager!(@<BackendData: Backend + 'static> FlyJa<BackendData>);
 
 delegate_input_method_manager!(@<BackendData: Backend + 'static> FlyJa<BackendData>);
+
+delegate_xdg_activation!(@<BackendData: Backend + 'static> FlyJa<BackendData>);
+
+impl<BackendData: Backend> XdgActivationHandler for FlyJa<BackendData> {
+    fn activation_state(&mut self) -> &mut XdgActivationState {
+        &mut self.xdg_activation_state
+    }
+    fn request_activation(
+        &mut self,
+        token: XdgActivationToken,
+        token_data: XdgActivationTokenData,
+        surface: WlSurface,
+    ) {
+        if token_data.timestamp.elapsed().as_secs() < 10 {
+            // Just grant the wish
+            let w = self
+                .space
+                .elements()
+                .find(|window| window.wl_surface().map(|s| s == surface).unwrap_or(false))
+                .cloned();
+            if let Some(window) = w {
+                self.space.raise_element(&window, true);
+            }
+        } else {
+            // Discard the request
+            self.xdg_activation_state.remove_request(&token);
+        }
+    }
+
+    fn destroy_activation(
+        &mut self,
+        _token: XdgActivationToken,
+        _token_data: XdgActivationTokenData,
+        _surface: WlSurface,
+    ) {
+        // The request is cancelled
+    }
+}
 
 #[derive(Default)]
 pub struct ClientState {

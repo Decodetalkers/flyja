@@ -12,7 +12,7 @@ use smithay::{
     reexports::wayland_server::protocol::wl_surface,
     render_elements,
     utils::{IsAlive, Logical, Physical, Point, Rectangle, Scale, Size},
-    wayland::{compositor::SurfaceData, shell::xdg::ToplevelSurface},
+    wayland::{compositor::SurfaceData, seat::WaylandFocus, shell::xdg::ToplevelSurface},
 };
 
 #[derive(Debug, Clone)]
@@ -117,6 +117,10 @@ impl WindowElement {
 
     pub fn geometry(&self) -> Rectangle<i32, Logical> {
         self.window.geometry()
+    }
+
+    pub fn wl_surface(&self) -> Option<wl_surface::WlSurface> {
+        self.window.wl_surface()
     }
 }
 
