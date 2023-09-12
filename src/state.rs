@@ -2,7 +2,7 @@ use std::{ffi::OsString, os::unix::io::AsRawFd, sync::Arc};
 
 use smithay::{
     delegate_input_method_manager, delegate_text_input_manager,
-    desktop::{Space, WindowSurfaceType},
+    desktop::{PopupManager, Space, WindowSurfaceType},
     input::Seat,
     input::{pointer::PointerHandle, SeatState},
     reexports::{
@@ -77,6 +77,7 @@ pub struct FlyJa<BackendData: Backend + 'static> {
     pub socket_name: OsString,
 
     pub space: Space<WindowElement>,
+    pub popups: PopupManager,
     pub loop_signal: LoopSignal,
 
     // State
@@ -274,6 +275,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
             start_time,
 
             space,
+            popups: PopupManager::default(),
             loop_signal,
             socket_name,
 

@@ -1,5 +1,6 @@
 use smithay::{
     delegate_xdg_shell,
+    desktop::PopupKind,
     input::{
         pointer::{Focus, GrabStartData},
         Seat,
@@ -36,9 +37,24 @@ impl<BackendData: Backend> XdgShellHandler for FlyJa<BackendData> {
     }
     fn new_popup(
         &mut self,
-        _surface: smithay::wayland::shell::xdg::PopupSurface,
-        _positioner: smithay::wayland::shell::xdg::PositionerState,
+        surface: smithay::wayland::shell::xdg::PopupSurface,
+        positioner: smithay::wayland::shell::xdg::PositionerState,
     ) {
+        // Do not send a configure here, the initial configure
+        // of a xdg_surface has to be sent during the commit if
+        // the surface is not already configured
+
+        // TODO: properly recompute the geometry with the whole of positioner state
+        surface.with_pending_state(|state| {
+            // NOTE: This is not really necessary as the default geometry
+            // is already set the same way, but for demonstrating how
+            // to set the initial popup geometry this code is left as
+            // an example
+            state.geometry = positioner.get_geometry();
+        });
+        if let Err(err) = self.popups.track_popup(PopupKind::from(surface)) {
+            tracing::warn!("Failed to track popup: {}", err);
+        }
         // TODO:
     }
 

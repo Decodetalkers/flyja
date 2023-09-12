@@ -1,13 +1,15 @@
 use smithay::{
     backend::renderer::utils::on_commit_buffer_handler,
     delegate_compositor, delegate_shm,
+    desktop::PopupKind,
     reexports::wayland_server::{protocol::wl_surface::WlSurface, Client},
     wayland::{
         buffer::BufferHandler,
         compositor::{
-            get_parent, is_sync_subsurface, CompositorClientState, CompositorHandler,
+            get_parent, is_sync_subsurface, with_states, CompositorClientState, CompositorHandler,
             CompositorState,
         },
+        shell::xdg::XdgPopupSurfaceData,
         shm::ShmHandler,
     },
 };
@@ -41,7 +43,24 @@ impl<BackendData: Backend> CompositorHandler for FlyJa<BackendData> {
                 window.on_commit();
             }
         }
-
+        if let Some(popup) = self.popups.find_popup(surface) {
+            let PopupKind::Xdg(ref popup) = popup;
+            let initial_configure_sent = with_states(surface, |states| {
+                states
+                    .data_map
+                    .get::<XdgPopupSurfaceData>()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .initial_configure_sent
+            });
+            if !initial_configure_sent {
+                // NOTE: This should never fail as the initial configure is always
+                // allowed.
+                popup.send_configure().expect("initial configure failed");
+            }
+        };
+        self.popups.commit(surface);
         self.handle_commit(surface);
 
         // TODO: need know the geo before put it to center
