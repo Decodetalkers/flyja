@@ -18,7 +18,7 @@ use smithay::{
 #[derive(Debug, Clone)]
 pub struct WindowElement {
     window: Window,
-    pub resize_size: Option<((i32, i32), (i32, i32))>,
+    pub resize_size: Option<(i32, i32)>,
 }
 
 impl PartialEq for WindowElement {
@@ -39,22 +39,16 @@ impl WindowElement {
         space.map_element(window, position, true);
     }
 
-    pub fn is_resize_finished(&self, space: &Space<Self>) -> bool {
-        let Some(((start_x, start_y), (end_x, end_y))) = self.resize_size else {
-            return false;
-        };
-        let Some(Point { x, y, .. }) = space.element_location(self) else {
+    pub fn is_resize_finished(&self) -> bool {
+        let Some((width, height)) = self.resize_size else {
             return false;
         };
 
         let Size { w, h, .. } = self.geometry().size;
-        (start_x - x).abs() < 5
-            && (start_y - y).abs() < 5
-            && (x + w - end_x).abs() < 5
-            && (y + h - end_y).abs() < 5
+        (w - width).abs() < 5 && (h - height).abs() < 5
     }
 
-    pub fn set_resize_size(&self, resize_size: ((i32, i32), (i32, i32))) -> Self {
+    pub fn set_resize_size(&self, resize_size: (i32, i32)) -> Self {
         WindowElement {
             resize_size: Some(resize_size),
             ..self.clone()
@@ -62,8 +56,8 @@ impl WindowElement {
     }
 
     pub fn get_pedding_size(&self) -> (i32, i32) {
-        if let Some(((start_x, start_y), (end_x, end_y))) = self.resize_size {
-            return (end_x - start_x, end_y - start_y);
+        if let Some((width, height)) = self.resize_size {
+            return (width, height);
         }
         let Size { w, h, .. } = self.geometry().size;
         (w, h)

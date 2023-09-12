@@ -617,8 +617,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
                 state.size = Some(size);
             });
             surface.send_pending_configure();
-            let (new_end_x, new_end_y) = (start_x + size.w, start_y + size.h);
-            let newwindow = window.set_resize_size(((*start_x, *start_y), (new_end_x, new_end_y)));
+            let newwindow = window.set_resize_size((size.w, size.h));
             self.space
                 .map_element(newwindow, (*start_x, *start_y), true);
         }
@@ -636,11 +635,11 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         let windows: Vec<WindowElement> = self
             .space
             .elements()
-            .filter(|w| w.is_resize_finished(&self.space))
+            .filter(|w| w.is_resize_finished())
             .cloned()
             .collect();
         for window in windows {
-            if window.is_resize_finished(&self.space) {
+            if window.is_resize_finished() {
                 window.remap_element(&mut self.space);
             }
         }

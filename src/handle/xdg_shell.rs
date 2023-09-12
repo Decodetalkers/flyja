@@ -79,8 +79,8 @@ impl<BackendData: Backend> XdgShellHandler for FlyJa<BackendData> {
             return;
         };
         let (x, y, newx, newy) = 'size: {
-            if let Some(((x, y), (newx, newy))) = window.resize_size {
-                break 'size (x, y, newx, newy);
+            if let Some((width, height)) = window.resize_size {
+                break 'size (x, y, x + width, y + height);
             }
             let Size {
                 w: width,
