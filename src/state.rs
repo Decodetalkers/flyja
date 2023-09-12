@@ -1,8 +1,9 @@
 use std::{ffi::OsString, os::unix::io::AsRawFd, sync::Arc};
 
 use smithay::{
-    delegate_input_method_manager, delegate_text_input_manager, delegate_xdg_activation,
-    desktop::{PopupManager, Space, WindowSurfaceType},
+    delegate_fractional_scale, delegate_input_method_manager, delegate_text_input_manager,
+    delegate_xdg_activation,
+    desktop::{utils::surface_primary_scanout_output, PopupManager, Space, WindowSurfaceType},
     input::Seat,
     input::{pointer::PointerHandle, SeatState},
     reexports::{
@@ -12,8 +13,9 @@ use smithay::{
     },
     utils::{Logical, Point},
     wayland::{
-        compositor::{CompositorClientState, CompositorState},
+        compositor::{get_parent, with_states, CompositorClientState, CompositorState},
         data_device::DataDeviceState,
+        fractional_scale::{with_fractional_scale, FractionalScaleHandler},
         output::OutputManagerState,
         shell::xdg::XdgShellState,
         shm::ShmState,
@@ -677,9 +679,68 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
     }
 }
 
+impl<BackendData: Backend> FlyJa<BackendData> {
+    pub fn window_for_surface(&self, surface: &WlSurface) -> Option<WindowElement> {
+        self.space
+            .elements()
+            .find(|window| window.wl_surface().map(|s| s == *surface).unwrap_or(false))
+            .cloned()
+    }
+}
+
 delegate_text_input_manager!(@<BackendData: Backend + 'static> FlyJa<BackendData>);
 
 delegate_input_method_manager!(@<BackendData: Backend + 'static> FlyJa<BackendData>);
+
+delegate_fractional_scale!(@<BackendData: Backend + 'static> FlyJa<BackendData>);
+impl<BackendData: Backend> FractionalScaleHandler for FlyJa<BackendData> {
+    fn new_fractional_scale(
+        &mut self,
+        surface: smithay::reexports::wayland_server::protocol::wl_surface::WlSurface,
+    ) {
+        // Here we can set the initial fractional scale
+        //
+        // First we look if the surface already has a primary scan-out output, if not
+        // we test if the surface is a subsurface and try to use the primary scan-out output
+        // of the root surface. If the root also has no primary scan-out output we just try
+        // to use the first output of the toplevel.
+        // If the surface is the root we also try to use the first output of the toplevel.
+        //
+        // If all the above tests do not lead to a output we just use the first output
+        // of the space (which in case of anvil will also be the output a toplevel will
+        // initially be placed on)
+        #[allow(clippy::redundant_clone)]
+        let mut root = surface.clone();
+        while let Some(parent) = get_parent(&root) {
+            root = parent;
+        }
+
+        with_states(&surface, |states| {
+            let primary_scanout_output = surface_primary_scanout_output(&surface, states)
+                .or_else(|| {
+                    if root != surface {
+                        with_states(&root, |states| {
+                            surface_primary_scanout_output(&root, states).or_else(|| {
+                                self.window_for_surface(&root).and_then(|window| {
+                                    self.space.outputs_for_element(&window).first().cloned()
+                                })
+                            })
+                        })
+                    } else {
+                        self.window_for_surface(&root).and_then(|window| {
+                            self.space.outputs_for_element(&window).first().cloned()
+                        })
+                    }
+                })
+                .or_else(|| self.space.outputs().next().cloned());
+            if let Some(output) = primary_scanout_output {
+                with_fractional_scale(states, |fractional_scale| {
+                    fractional_scale.set_preferred_scale(output.current_scale().fractional_scale());
+                });
+            }
+        });
+    }
+}
 
 delegate_xdg_activation!(@<BackendData: Backend + 'static> FlyJa<BackendData>);
 
