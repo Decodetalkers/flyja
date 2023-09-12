@@ -15,7 +15,10 @@ use smithay::{
     utils::{Point, Serial, Size},
     wayland::{
         compositor::with_states,
-        shell::xdg::{Configure, ToplevelSurface, XdgShellHandler, XdgToplevelSurfaceData},
+        shell::xdg::{
+            Configure, ToplevelSurface, XdgPopupSurfaceData, XdgShellHandler,
+            XdgToplevelSurfaceData,
+        },
     },
 };
 
@@ -140,7 +143,26 @@ impl<BackendData: Backend> XdgShellHandler for FlyJa<BackendData> {
 }
 
 impl<BackendData: Backend + 'static> FlyJa<BackendData> {
-    pub fn handle_commit(&mut self, surface: &wl_surface::WlSurface) -> Option<()> {
+    pub fn handle_popup_commit(&self, surface: &wl_surface::WlSurface) {
+        if let Some(popup) = self.popups.find_popup(surface) {
+            let PopupKind::Xdg(ref popup) = popup;
+            let initial_configure_sent = with_states(surface, |states| {
+                states
+                    .data_map
+                    .get::<XdgPopupSurfaceData>()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .initial_configure_sent
+            });
+            if !initial_configure_sent {
+                // NOTE: This should never fail as the initial configure is always
+                // allowed.
+                popup.send_configure().expect("initial configure failed");
+            }
+        };
+    }
+    pub fn handle_window_commit(&mut self, surface: &wl_surface::WlSurface) -> Option<()> {
         let window = self
             .space
             .elements()
