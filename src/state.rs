@@ -1,6 +1,7 @@
 use std::{ffi::OsString, os::unix::io::AsRawFd, sync::Arc};
 
 use smithay::{
+    delegate_input_method_manager, delegate_text_input_manager,
     desktop::{Space, WindowSurfaceType},
     input::Seat,
     input::{pointer::PointerHandle, SeatState},
@@ -668,6 +669,10 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         window.toplevel().send_configure();
     }
 }
+
+delegate_text_input_manager!(@<BackendData: Backend + 'static> FlyJa<BackendData>);
+
+delegate_input_method_manager!(@<BackendData: Backend + 'static> FlyJa<BackendData>);
 
 #[derive(Default)]
 pub struct ClientState {
