@@ -29,23 +29,10 @@ impl PartialEq for WindowElement {
 
 impl WindowElement {
     pub fn remap_element(&self, space: &mut Space<Self>) {
-        let window = WindowElement {
-            resize_size: None,
-            ..self.clone()
-        };
         let Some(position) = space.element_location(self) else {
             return;
         };
-        space.map_element(window, position, true);
-    }
-
-    pub fn is_resize_finished(&self) -> bool {
-        let Some((width, height)) = self.resize_size else {
-            return false;
-        };
-
-        let Size { w, h, .. } = self.geometry().size;
-        (w - width).abs() < 5 && (h - height).abs() < 5
+        space.map_element(self.clone(), position, true);
     }
 
     pub fn set_resize_size(&self, resize_size: (i32, i32)) -> Self {
@@ -53,14 +40,6 @@ impl WindowElement {
             resize_size: Some(resize_size),
             ..self.clone()
         }
-    }
-
-    pub fn get_pedding_size(&self) -> (i32, i32) {
-        if let Some((width, height)) = self.resize_size {
-            return (width, height);
-        }
-        let Size { w, h, .. } = self.geometry().size;
-        (w, h)
     }
 }
 
@@ -109,10 +88,6 @@ impl WindowElement {
             .send_frame(output, time, throttle, primary_scan_out_output)
     }
 
-    pub fn geometry(&self) -> Rectangle<i32, Logical> {
-        self.window.geometry()
-    }
-
     pub fn wl_surface(&self) -> Option<wl_surface::WlSurface> {
         self.window.wl_surface()
     }
@@ -126,7 +101,12 @@ impl IsAlive for WindowElement {
 
 impl SpaceElement for WindowElement {
     fn geometry(&self) -> Rectangle<i32, smithay::utils::Logical> {
-        SpaceElement::geometry(&self.window)
+        let geo = SpaceElement::geometry(&self.window);
+        if let Some((width, height)) = self.resize_size {
+            let geo = Rectangle::from_loc_and_size(geo.loc, Size::from((width, height)));
+            return geo;
+        }
+        geo
     }
 
     fn bbox(&self) -> Rectangle<i32, smithay::utils::Logical> {

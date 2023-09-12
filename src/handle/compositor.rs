@@ -55,7 +55,7 @@ impl<BackendData: Backend> CompositorHandler for FlyJa<BackendData> {
         // Tile
         if self.wmstatus == WmStatus::Tile {
             self.handle_window_mul_removed_finished();
-            self.handle_window_mul_removed_finished_check();
+            //self.handle_window_mul_removed_finished_check();
             self.handle_resize_tile_window_changing();
             self.handle_resize_tile_window_finished();
             self.handle_resize_tile_split_window_finished();

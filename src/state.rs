@@ -3,7 +3,7 @@ use std::{ffi::OsString, os::unix::io::AsRawFd, sync::Arc};
 use smithay::{
     delegate_fractional_scale, delegate_input_method_manager, delegate_text_input_manager,
     delegate_xdg_activation,
-    desktop::{utils::surface_primary_scanout_output, PopupManager, Space, WindowSurfaceType},
+    desktop::{space::SpaceElement, utils::surface_primary_scanout_output, PopupManager, Space, WindowSurfaceType},
     input::Seat,
     input::{pointer::PointerHandle, SeatState},
     reexports::{
@@ -11,7 +11,7 @@ use smithay::{
         wayland_protocols::xdg::shell::server::xdg_toplevel,
         wayland_server::{backend::ClientData, protocol::wl_surface::WlSurface, Display},
     },
-    utils::{Logical, Point},
+    utils::{Logical, Point, Size},
     wayland::{
         compositor::{get_parent, with_states, CompositorClientState, CompositorState},
         data_device::DataDeviceState,
@@ -115,7 +115,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
             let Some(Point { x, y, .. }) = self.space.element_location(w) else {
                 return false;
             };
-            let (w, h) = w.get_pedding_size();
+            let Size { w, h, .. } = w.geometry().size;
             (x - start_x).abs() < 5 && (y + h - start_y).abs() < 5 && x + w <= end_x + 5
         }) else {
             return output;
@@ -123,7 +123,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         let Some(Point { x, y, .. }) = self.space.element_location(window) else {
             return output;
         };
-        let (w, _) = window.get_pedding_size();
+        let Size { w, .. } = window.geometry().size;
         output.push(((x, y), window.clone()));
         if (x + w - end_x).abs() < 5 {
             return output;
@@ -150,7 +150,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
             let Some(Point { x, y, .. }) = self.space.element_location(w) else {
                 return false;
             };
-            let (w, _) = w.get_pedding_size();
+            let Size { w, .. } = w.geometry().size;
             (x - start_x).abs() < 5 && (y - end_y).abs() < 5 && x + w <= end_x + 5
         }) else {
             return output;
@@ -158,7 +158,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         let Some(Point { x, .. }) = self.space.element_location(window) else {
             return output;
         };
-        let (w, _) = window.get_pedding_size();
+        let Size { w, .. } = window.geometry().size;
         output.push(((start_x, start_y), window.clone()));
         if (x + w - end_x).abs() < 5 {
             return output;
@@ -185,7 +185,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
             let Some(Point { x, y, .. }) = self.space.element_location(window) else {
                 return false;
             };
-            let (w, h) = window.get_pedding_size();
+            let Size { w, h, .. } = window.geometry().size;
             (x + w - start_x).abs() < 5 && (y - start_y).abs() < 5 && y + h <= end_y + 5
         }) else {
             return output;
@@ -193,7 +193,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         let Some(Point { y, x, .. }) = self.space.element_location(window) else {
             return output;
         };
-        let (_, h) = window.get_pedding_size();
+        let Size { h, .. } = window.geometry().size;
         output.push(((x, start_y), window.clone()));
         if (y + h - end_y).abs() < 5 {
             return output;
@@ -220,7 +220,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
             let Some(Point { x, y, .. }) = self.space.element_location(window) else {
                 return false;
             };
-            let (_, h) = window.get_pedding_size();
+            let Size { h, .. } = window.geometry().size;
             (x - end_x).abs() < 5 && (y - start_y).abs() < 5 && y + h <= end_y + 5
         }) else {
             return output;
@@ -228,7 +228,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         let Some(Point { y, .. }) = self.space.element_location(window) else {
             return output;
         };
-        let (_, h) = window.get_pedding_size();
+        let Size { h, .. } = window.geometry().size;
         output.push(((start_x, start_y), window.clone()));
         if (y + h - end_y).abs() < 5 {
             return output;
@@ -399,13 +399,17 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
                 (x, y, width, height)
             }
         };
-        let surface = window.toplevel();
+
+        let newwindow = window.set_resize_size((width, height));
+        let surface = newwindow.toplevel();
 
         surface.with_pending_state(|state| {
             state.states.set(xdg_toplevel::State::Resizing);
             state.size = Some((width, height).into());
         });
         surface.send_pending_configure();
+
+        newwindow.remap_element(&mut self.space);
 
         Some((surface.wl_surface().clone(), x, y, width, height))
     }
@@ -446,13 +450,15 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
             };
             geo.size
         };
-        let surface_top = window.toplevel();
+        let newwindow = window.set_resize_size((prosize.w, prosize.h));
+        let surface_top = newwindow.toplevel();
         surface_top.with_pending_state(|state| {
             state.states.set(xdg_toplevel::State::Resizing);
             let size = prosize;
             state.size = Some(size);
         });
         surface_top.send_configure();
+        newwindow.remap_element(&mut self.space);
     }
 
     fn handle_split_element(&mut self, surface: &WlSurface) {
@@ -464,19 +470,22 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
             .space
             .elements()
             .find(|w| w.toplevel().wl_surface() == surface)
+            .cloned()
         else {
             return;
         };
-        let surface = window.toplevel();
+        let newwindow = window.set_resize_size((width, height));
+        let surface = newwindow.toplevel();
         surface.with_pending_state(|state| {
             state.states.set(xdg_toplevel::State::Resizing);
             state.size = Some((width, height).into());
         });
         surface.send_pending_configure();
+        //newwindow.remap_element(&mut self.space);
         self.reseize_state =
             PeddingResize::ResizeTwoWindowFinished((surface_before, surface.wl_surface().clone()));
 
-        self.space.map_element(window.clone(), (x, y), true);
+        self.space.map_element(newwindow, (x, y), true);
     }
 
     pub fn handle_resize_tile_window_changing(&mut self) {
@@ -603,7 +612,7 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
         };
         for ((start_x, start_y), window) in elements_and_poss.iter() {
             // FIXME:
-            let (w, h) = window.get_pedding_size();
+            let Size { w, h, .. } = window.geometry().size;
             let height_add = pos_end.1 - pos_start.1;
             let width_add = pos_end.0 - pos_start.0;
             let surface = window.toplevel();
@@ -626,23 +635,6 @@ impl<BackendData: Backend + 'static> FlyJa<BackendData> {
             .map(|e| e.1.toplevel().wl_surface().clone())
             .collect();
         self.window_remove_state = WindowRemoved::PeddingMutiResizeFinished(surfaces);
-    }
-
-    pub fn handle_window_mul_removed_finished_check(&mut self) {
-        let WindowRemoved::NoState = self.window_remove_state else {
-            return;
-        };
-        let windows: Vec<WindowElement> = self
-            .space
-            .elements()
-            .filter(|w| w.is_resize_finished())
-            .cloned()
-            .collect();
-        for window in windows {
-            if window.is_resize_finished() {
-                window.remap_element(&mut self.space);
-            }
-        }
     }
 
     pub fn handle_window_mul_removed_finished(&mut self) {

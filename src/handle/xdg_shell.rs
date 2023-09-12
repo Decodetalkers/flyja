@@ -1,6 +1,6 @@
 use smithay::{
     delegate_xdg_shell,
-    desktop::PopupKind,
+    desktop::{PopupKind, space::SpaceElement},
     input::{
         pointer::{Focus, GrabStartData},
         Seat,
@@ -78,10 +78,7 @@ impl<BackendData: Backend> XdgShellHandler for FlyJa<BackendData> {
         let Some(Point { x, y, .. }) = self.space.element_location(window) else {
             return;
         };
-        let (x, y, newx, newy) = 'size: {
-            if let Some((width, height)) = window.resize_size {
-                break 'size (x, y, x + width, y + height);
-            }
+        let (x, y, newx, newy) = {
             let Size {
                 w: width,
                 h: height,
