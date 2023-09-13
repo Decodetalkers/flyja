@@ -1,6 +1,6 @@
 use smithay::{
     delegate_xdg_shell,
-    desktop::{PopupKind, space::SpaceElement},
+    desktop::{space::SpaceElement, PopupKind},
     input::{
         pointer::{Focus, GrabStartData},
         Seat,
@@ -92,7 +92,6 @@ impl<BackendData: Backend> XdgShellHandler for FlyJa<BackendData> {
             pos_end: (newx, newy),
         };
         self.handle_window_removed_mul();
-        // TODO: resize again
     }
 
     fn xdg_shell_state(&mut self) -> &mut smithay::wayland::shell::xdg::XdgShellState {
