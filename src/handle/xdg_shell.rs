@@ -100,11 +100,28 @@ impl<BackendData: Backend> XdgShellHandler for FlyJa<BackendData> {
 
     fn resize_request(
         &mut self,
-        _surface: ToplevelSurface,
-        _seat: wl_seat::WlSeat,
-        _serial: Serial,
-        _edges: xdg_toplevel::ResizeEdge,
+        surface: ToplevelSurface,
+        seat: wl_seat::WlSeat,
+        serial: Serial,
+        edges: xdg_toplevel::ResizeEdge,
     ) {
+        let seat: Seat<FlyJa<BackendData>> = Seat::from_resource(&seat).unwrap();
+
+        let pointer = seat.get_pointer().unwrap();
+
+        if !pointer.has_grab(serial) {
+            return;
+        }
+
+        let wl_surface = surface.wl_surface();
+
+        let window = self.window_for_surface(wl_surface).unwrap();
+
+        let Some(start_data) = check_grab(&seat, wl_surface, serial) else {
+            return;
+        };
+        let initial_window_location = self.space.element_location(&window).unwrap();
+        let Size { w, h, .. } = window.geometry().size;
     }
 
     fn move_request(&mut self, surface: ToplevelSurface, seat: wl_seat::WlSeat, serial: Serial) {

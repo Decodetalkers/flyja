@@ -3,7 +3,10 @@ use std::{ffi::OsString, os::unix::io::AsRawFd, sync::Arc};
 use smithay::{
     delegate_fractional_scale, delegate_input_method_manager, delegate_text_input_manager,
     delegate_xdg_activation,
-    desktop::{space::SpaceElement, utils::surface_primary_scanout_output, PopupManager, Space, WindowSurfaceType},
+    desktop::{
+        space::SpaceElement, utils::surface_primary_scanout_output, PopupManager, Space,
+        WindowSurfaceType,
+    },
     input::Seat,
     input::{pointer::PointerHandle, SeatState},
     reexports::{
