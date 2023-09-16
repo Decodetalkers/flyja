@@ -29,6 +29,41 @@ use crate::{
     FlyJa,
 };
 
+impl<BackendData: Backend> FlyJa<BackendData> {
+    fn get_h_windows_left(
+        &self,
+        start_x: i32,
+        start_y: i32,
+        end_y: i32,
+    ) -> (Vec<WindowElement>, Vec<WindowElement>) {
+        todo!()
+    }
+    fn get_h_windows_right(
+        &self,
+        end_x: i32,
+        start_y: i32,
+        end_y: i32,
+    ) -> (Vec<WindowElement>, Vec<WindowElement>) {
+        todo!()
+    }
+    fn get_v_windows_top(
+        &self,
+        start_x: i32,
+        end_x: i32,
+        start_y: i32,
+    ) -> (Vec<WindowElement>, Vec<WindowElement>) {
+        todo!()
+    }
+    fn get_v_windows_bottom(
+        &self,
+        start_x: i32,
+        end_x: i32,
+        end_y: i32,
+    ) -> (Vec<WindowElement>, Vec<WindowElement>) {
+        todo!()
+    }
+}
+
 impl<BackendData: Backend> XdgShellHandler for FlyJa<BackendData> {
     fn grab(
         &mut self,
@@ -120,8 +155,32 @@ impl<BackendData: Backend> XdgShellHandler for FlyJa<BackendData> {
         let Some(start_data) = check_grab(&seat, wl_surface, serial) else {
             return;
         };
-        let initial_window_location = self.space.element_location(&window).unwrap();
+        let Point {
+            x: start_x,
+            y: start_y,
+            ..
+        } = self.space.element_location(&window).unwrap();
         let Size { w, h, .. } = window.geometry().size;
+
+        let end_x = start_x + w;
+        let end_y = start_y + h;
+        let (list_l, list_r) = match edges {
+            xdg_toplevel::ResizeEdge::Left
+            | xdg_toplevel::ResizeEdge::TopLeft
+            | xdg_toplevel::ResizeEdge::BottomLeft => {
+                self.get_h_windows_left(start_x, start_y, end_y)
+            }
+            xdg_toplevel::ResizeEdge::Right
+            | xdg_toplevel::ResizeEdge::TopRight
+            | xdg_toplevel::ResizeEdge::BottomRight => {
+                self.get_h_windows_right(end_x, start_y, end_y)
+            }
+            xdg_toplevel::ResizeEdge::Top => self.get_v_windows_top(start_x, end_x, start_y),
+            xdg_toplevel::ResizeEdge::Bottom => self.get_h_windows_right(end_x, start_y, end_y),
+            _ => {
+                return;
+            }
+        };
     }
 
     fn move_request(&mut self, surface: ToplevelSurface, seat: wl_seat::WlSeat, serial: Serial) {
