@@ -17,7 +17,7 @@ use smithay::{
         compositor::with_states,
         shell::xdg::{
             Configure, ToplevelSurface, XdgPopupSurfaceData, XdgShellHandler,
-            XdgToplevelSurfaceData,
+            XdgToplevelSurfaceData, SurfaceCachedState,
         },
     },
 };
