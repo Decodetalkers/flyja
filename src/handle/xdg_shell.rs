@@ -32,35 +32,99 @@ use crate::{
 impl<BackendData: Backend> FlyJa<BackendData> {
     fn get_h_windows_left(
         &self,
+        window: WindowElement,
         start_x: i32,
         start_y: i32,
         end_y: i32,
-    ) -> (Vec<WindowElement>, Vec<WindowElement>) {
-        todo!()
+    ) -> Option<(Vec<WindowElement>, Vec<WindowElement>)> {
+        let Some(leftwindow) = self.space.elements().find(|w| {
+            let Some(Point { x, y, .. }) = self.space.element_location(w) else {
+                return false;
+            };
+            let Size { w, h, .. } = w.geometry().size;
+            x + w == start_x && y <= start_y && y + h > start_y
+        }) else {
+            return None;
+        };
+        let Size { w, h, .. } = leftwindow.geometry().size;
+        let Point { x, y, .. } = self.space.element_location(leftwindow).unwrap();
+        if y == start_y && y + h == end_y {
+            return Some((vec![leftwindow.clone()], vec![window]));
+        }
+        // TODO: finish last part
+        None
     }
     fn get_h_windows_right(
         &self,
+        window: WindowElement,
         end_x: i32,
         start_y: i32,
         end_y: i32,
-    ) -> (Vec<WindowElement>, Vec<WindowElement>) {
-        todo!()
+    ) -> Option<(Vec<WindowElement>, Vec<WindowElement>)> {
+        let Some(rightwidow) = self.space.elements().find(|w| {
+            let Some(Point { x, y, .. }) = self.space.element_location(w) else {
+                return false;
+            };
+            let Size { h, .. } = w.geometry().size;
+            x == end_x && y <= start_y && y + h > start_y
+        }) else {
+            return None;
+        };
+        let Size { w, h, .. } = rightwidow.geometry().size;
+        let Point { x, y, .. } = self.space.element_location(rightwidow).unwrap();
+        if y == start_y && y + h == end_y {
+            return Some((vec![rightwidow.clone()], vec![window]));
+        }
+        // TODO:
+        None
     }
     fn get_v_windows_top(
         &self,
+        window: WindowElement,
         start_x: i32,
         end_x: i32,
         start_y: i32,
-    ) -> (Vec<WindowElement>, Vec<WindowElement>) {
-        todo!()
+    ) -> Option<(Vec<WindowElement>, Vec<WindowElement>)> {
+        let Some(topwidow) = self.space.elements().find(|w| {
+            let Some(Point { x, y, .. }) = self.space.element_location(w) else {
+                return false;
+            };
+            let Size { w, h, .. } = w.geometry().size;
+            y + h == start_y && x <= start_x && x + w > start_x
+        }) else {
+            return None;
+        };
+        let Size { w, h, .. } = topwidow.geometry().size;
+        let Point { x, y, .. } = self.space.element_location(topwidow).unwrap();
+        if x == start_x && x + w == end_x {
+            return Some((vec![topwidow.clone()], vec![window]));
+        }
+        // TODO:
+        None
     }
     fn get_v_windows_bottom(
         &self,
+        window: WindowElement,
         start_x: i32,
         end_x: i32,
         end_y: i32,
-    ) -> (Vec<WindowElement>, Vec<WindowElement>) {
-        todo!()
+    ) -> Option<(Vec<WindowElement>, Vec<WindowElement>)> {
+        let Some(bottom) = self.space.elements().find(|w| {
+            let Some(Point { x, y, .. }) = self.space.element_location(w) else {
+                return false;
+            };
+            let Size { w, .. } = w.geometry().size;
+            y == end_y && x <= start_x && x + w > start_x
+        }) else {
+            return None;
+        };
+        let Size { w, h, .. } = bottom.geometry().size;
+        let Point { x, y, .. } = self.space.element_location(bottom).unwrap();
+        if x == start_x && x + w == end_x {
+            return Some((vec![bottom.clone()], vec![window]));
+        }
+        // TODO:
+        None
     }
 }
 
@@ -164,23 +228,30 @@ impl<BackendData: Backend> XdgShellHandler for FlyJa<BackendData> {
 
         let end_x = start_x + w;
         let end_y = start_y + h;
-        let (list_l, list_r) = match edges {
+        let Some((list_l, list_r)) = (match edges {
             xdg_toplevel::ResizeEdge::Left
             | xdg_toplevel::ResizeEdge::TopLeft
             | xdg_toplevel::ResizeEdge::BottomLeft => {
-                self.get_h_windows_left(start_x, start_y, end_y)
+                self.get_h_windows_left(window, start_x, start_y, end_y)
             }
             xdg_toplevel::ResizeEdge::Right
             | xdg_toplevel::ResizeEdge::TopRight
             | xdg_toplevel::ResizeEdge::BottomRight => {
-                self.get_h_windows_right(end_x, start_y, end_y)
+                self.get_h_windows_right(window, end_x, start_y, end_y)
             }
-            xdg_toplevel::ResizeEdge::Top => self.get_v_windows_top(start_x, end_x, start_y),
-            xdg_toplevel::ResizeEdge::Bottom => self.get_h_windows_right(end_x, start_y, end_y),
+            xdg_toplevel::ResizeEdge::Top => {
+                self.get_v_windows_top(window, start_x, end_x, start_y)
+            }
+            xdg_toplevel::ResizeEdge::Bottom => {
+                self.get_h_windows_right(window, end_x, start_y, end_y)
+            }
             _ => {
                 return;
             }
+        }) else {
+            return;
         };
+        println!("{list_l:?}, {list_r:?}")
     }
 
     fn move_request(&mut self, surface: ToplevelSurface, seat: wl_seat::WlSeat, serial: Serial) {
