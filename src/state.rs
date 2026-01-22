@@ -1,7 +1,8 @@
 use smithay::{
     input::{Seat, SeatHandler, SeatState},
-    reexports::wayland_server::protocol::wl_surface::WlSurface,
+    reexports::wayland_server::protocol::{wl_buffer::WlBuffer, wl_surface::WlSurface},
     wayland::{
+        buffer::BufferHandler,
         compositor::CompositorState,
         selection::{
             SelectionHandler, SelectionSource, SelectionTarget,
@@ -53,3 +54,7 @@ impl<BackendData: Backend> SelectionHandler for FlyjaState<BackendData> {
 }
 
 impl<BackendData: Backend + 'static> FlyjaState<BackendData> {}
+
+impl<BackendData: Backend> BufferHandler for FlyjaState<BackendData> {
+    fn buffer_destroyed(&mut self, _buffer: &WlBuffer) {}
+}
