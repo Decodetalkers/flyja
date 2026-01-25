@@ -36,6 +36,8 @@ pub struct WinitData {
 }
 
 impl Backend for WinitData {
+    const HAS_GUSTURES: bool = true;
+    const HAS_RELATIVE_MOTION: bool = true;
     fn seat_name(&self) -> String {
         "winit".to_owned()
     }

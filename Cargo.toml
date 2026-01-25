@@ -14,3 +14,4 @@ smithay = { git = "https://github.com/Smithay/smithay.git", features = [
 	"backend_egl",
 	"use_system_lib",
 ] }
+profiling = "1.0"
