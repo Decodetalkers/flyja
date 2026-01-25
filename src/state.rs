@@ -1,15 +1,34 @@
 use smithay::{
+    delegate_output,
     input::{Seat, SeatHandler, SeatState},
-    reexports::wayland_server::protocol::{wl_buffer::WlBuffer, wl_surface::WlSurface},
+    reexports::wayland_server::{
+        backend::{ClientData, ClientId, DisconnectReason},
+        protocol::{wl_buffer::WlBuffer, wl_surface::WlSurface},
+    },
     wayland::{
         buffer::BufferHandler,
-        compositor::CompositorState,
+        compositor::{CompositorClientState, CompositorState},
+        output::OutputHandler,
         selection::{
             SelectionHandler, SelectionSource, SelectionTarget,
             data_device::{DataDeviceHandler, DataDeviceState, WaylandDndGrabHandler},
         },
     },
 };
+
+#[derive(Default)]
+pub struct ClientState {
+    pub compositor_state: CompositorClientState,
+}
+impl ClientData for ClientState {
+    fn initialized(&self, _client_id: ClientId) {
+        println!("initialized");
+    }
+
+    fn disconnected(&self, _client_id: ClientId, _reason: DisconnectReason) {
+        println!("disconnected");
+    }
+}
 
 pub trait Backend {
     const HAS_RELATIVE_MOTION: bool = false;
@@ -58,3 +77,7 @@ impl<BackendData: Backend + 'static> FlyjaState<BackendData> {}
 impl<BackendData: Backend> BufferHandler for FlyjaState<BackendData> {
     fn buffer_destroyed(&mut self, _buffer: &WlBuffer) {}
 }
+
+impl<BackendData: Backend> OutputHandler for FlyjaState<BackendData> {}
+
+delegate_output!(@<BackendData: Backend + 'static> FlyjaState<BackendData>);

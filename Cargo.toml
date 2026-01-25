@@ -10,4 +10,7 @@ bitflags = "2.10.0"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 xkbcommon = "0.9.0"
-smithay = { git = "https://github.com/Smithay/smithay.git" }
+smithay = { git = "https://github.com/Smithay/smithay.git", features = [
+	"backend_egl",
+	"use_system_lib",
+] }
