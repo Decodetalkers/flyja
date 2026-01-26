@@ -2,7 +2,9 @@ use smithay::{
     backend::renderer::utils::on_commit_buffer_handler,
     delegate_compositor,
     reexports::wayland_server::{Client, protocol::wl_surface::WlSurface},
-    wayland::compositor::{CompositorClientState, CompositorHandler, CompositorState},
+    wayland::compositor::{
+        CompositorClientState, CompositorHandler, CompositorState, get_parent, is_sync_subsurface,
+    },
 };
 
 use crate::state::{Backend, ClientState, FlyjaState};
@@ -17,6 +19,19 @@ impl<BackendData: Backend> CompositorHandler for FlyjaState<BackendData> {
     }
     fn commit(&mut self, surface: &WlSurface) {
         on_commit_buffer_handler::<Self>(surface);
+        if !is_sync_subsurface(surface) {
+            let mut root = surface.clone();
+            while let Some(parent) = get_parent(&root) {
+                root = parent;
+            }
+            if let Some(window) = self
+                .space
+                .elements()
+                .find(|w| w.toplevel().unwrap().wl_surface() == &root)
+            {
+                window.on_commit();
+            }
+        };
     }
 }
 

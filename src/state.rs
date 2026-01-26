@@ -6,14 +6,16 @@ use smithay::{
     delegate_relative_pointer, delegate_seat, delegate_shm, delegate_tablet_manager,
     delegate_text_input_manager, delegate_viewporter, delegate_virtual_keyboard_manager,
     delegate_xdg_activation, delegate_xdg_decoration, delegate_xdg_foreign, delegate_xdg_shell,
-    desktop::{PopupKind, PopupManager, Space, Window},
+    desktop::{PopupKind, PopupManager, Space, Window, WindowSurfaceType},
     input::{
         Seat, SeatHandler, SeatState,
         keyboard::XkbConfig,
         pointer::{CursorImageStatus, PointerHandle},
     },
     reexports::{
-        calloop::{Interest, LoopHandle, Mode, PostAction, generic::Generic},
+        calloop::{
+            EventLoop, Interest, LoopHandle, LoopSignal, Mode, PostAction, generic::Generic,
+        },
         wayland_protocols::xdg::{
             decoration::{
                 self as xdg_decoration,
@@ -97,10 +99,12 @@ pub trait Backend {
 
 pub struct FlyjaState<BackendData: Backend + 'static> {
     pub backend_data: BackendData,
+    pub start_time: std::time::Instant,
+
     pub socket_name: Option<String>,
     pub display_handle: DisplayHandle,
     pub handle: LoopHandle<'static, Self>,
-    pub running: Arc<AtomicBool>,
+    pub signal: LoopSignal,
 
     // desktop
     pub space: Space<Window>,
@@ -131,10 +135,11 @@ pub struct FlyjaState<BackendData: Backend + 'static> {
 impl<BackendData: Backend + 'static> FlyjaState<BackendData> {
     pub fn init(
         display: Display<Self>,
-        handle: LoopHandle<'static, Self>,
+        event_loop: &EventLoop<'static, Self>,
         backend_data: BackendData,
         listen_on_socket: bool,
     ) -> Self {
+        let handle = event_loop.handle();
         let dh = display.handle();
         let clock: Clock<Monotonic> = Clock::new();
 
@@ -209,13 +214,16 @@ impl<BackendData: Backend + 'static> FlyjaState<BackendData> {
         seat.add_keyboard(XkbConfig::default(), 200, 2)
             .expect("We need keyboard");
         let keyboard_shortcuts_inhibit_state = KeyboardShortcutsInhibitState::new::<Self>(&dh);
+        let signal = event_loop.get_signal();
+        let start_time = std::time::Instant::now();
 
         Self {
+            start_time,
             backend_data,
             display_handle: dh,
             socket_name,
             handle,
-            running: Arc::new(AtomicBool::new(true)),
+            signal,
             space: Space::default(),
             popups: PopupManager::default(),
 
@@ -240,6 +248,18 @@ impl<BackendData: Backend + 'static> FlyjaState<BackendData> {
             viewporter_state,
             cursor_status: CursorImageStatus::default_named(),
         }
+    }
+    pub fn surface_under(
+        &self,
+        pos: Point<f64, Logical>,
+    ) -> Option<(WlSurface, Point<f64, Logical>)> {
+        self.space
+            .element_under(pos)
+            .and_then(|(window, location)| {
+                window
+                    .surface_under(pos - location.to_f64(), WindowSurfaceType::ALL)
+                    .map(|(s, p)| (s, (p + location).to_f64()))
+            })
     }
 }
 
@@ -326,9 +346,10 @@ impl<BackendData: Backend> XdgShellHandler for FlyjaState<BackendData> {
         &mut self.xdg_shell_state
     }
     fn new_toplevel(&mut self, surface: ToplevelSurface) {
-        surface.with_pending_state(|state| {
-            state.states.set(xdg_toplevel::State::Activated);
-        });
+        let window = Window::new_wayland_window(surface.clone());
+        self.space.map_element(window, (0, 0), true);
+
+        // TODO: send_configure in other place
         surface.send_configure();
     }
     fn new_popup(&mut self, surface: PopupSurface, positioner: PositionerState) {}
