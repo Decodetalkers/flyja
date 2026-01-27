@@ -1,4 +1,5 @@
 use smithay::{
+    desktop::PopupKind,
     reexports::wayland_server::protocol::wl_surface::WlSurface,
     wayland::{compositor::with_states, shell::xdg::XdgToplevelSurfaceData},
 };
@@ -6,7 +7,7 @@ use smithay::{
 use crate::state::{Backend, FlyjaState};
 
 impl<BackendData: Backend> FlyjaState<BackendData> {
-    pub fn handle_xdg_commit(&self, surface: &WlSurface) {
+    pub fn handle_xdg_commit(&mut self, surface: &WlSurface) {
         if let Some(window) = self
             .space
             .elements()
@@ -25,6 +26,19 @@ impl<BackendData: Backend> FlyjaState<BackendData> {
 
             if !initial_configure_sent {
                 window.toplevel().unwrap().send_configure();
+            }
+        }
+        self.popups.commit(surface);
+        if let Some(popup) = &self.popups.find_popup(surface) {
+            match popup {
+                PopupKind::Xdg(xdg) => {
+                    if !xdg.is_initial_configure_sent() {
+                        // NOTE: This should never fail as the initial configure is always
+                        // allowed.
+                        xdg.send_configure().expect("initial configure failed");
+                    }
+                }
+                PopupKind::InputMethod(_input_method) => {}
             }
         }
     }
