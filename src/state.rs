@@ -75,7 +75,7 @@ use smithay::{
     },
 };
 
-use std::sync::{Arc, atomic::AtomicBool};
+use std::sync::Arc;
 
 #[derive(Default)]
 pub struct ClientState {
@@ -339,31 +339,6 @@ impl<BackendData: Backend> XdgForeignHandler for FlyjaState<BackendData> {
         &mut self.xdg_foreign_state
     }
 }
-
-// TODO: remove to shell folder
-impl<BackendData: Backend> XdgShellHandler for FlyjaState<BackendData> {
-    fn xdg_shell_state(&mut self) -> &mut XdgShellState {
-        &mut self.xdg_shell_state
-    }
-    fn new_toplevel(&mut self, surface: ToplevelSurface) {
-        let window = Window::new_wayland_window(surface.clone());
-        self.space.map_element(window, (0, 0), true);
-
-        // TODO: send_configure in other place
-        surface.send_configure();
-    }
-    fn new_popup(&mut self, surface: PopupSurface, positioner: PositionerState) {}
-    fn grab(&mut self, surface: PopupSurface, seat: WlSeat, serial: smithay::utils::Serial) {}
-    fn reposition_request(
-        &mut self,
-        surface: PopupSurface,
-        positioner: PositionerState,
-        token: u32,
-    ) {
-    }
-}
-
-delegate_xdg_shell!(@<BackendData: Backend + 'static> FlyjaState<BackendData>);
 
 impl<BackendData: Backend> XdgDecorationHandler for FlyjaState<BackendData> {
     fn new_decoration(&mut self, toplevel: ToplevelSurface) {
