@@ -5,7 +5,7 @@ use smithay::{
     delegate_pointer_constraints, delegate_pointer_gestures, delegate_primary_selection,
     delegate_relative_pointer, delegate_seat, delegate_shm, delegate_tablet_manager,
     delegate_text_input_manager, delegate_viewporter, delegate_virtual_keyboard_manager,
-    delegate_xdg_activation, delegate_xdg_decoration, delegate_xdg_foreign, delegate_xdg_shell,
+    delegate_xdg_activation, delegate_xdg_decoration, delegate_xdg_foreign,
     desktop::{PopupKind, PopupManager, Space, Window, WindowSurfaceType},
     input::{
         Seat, SeatHandler, SeatState,
