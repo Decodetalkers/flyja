@@ -10,11 +10,12 @@ use smithay::{
     utils::{Logical, Point},
 };
 
+use crate::shell::element::WindowElement;
 use crate::state::{Backend, FlyjaState};
 
 pub struct MoveSurfaceGrab<BackendData: Backend + 'static> {
     pub start_data: PointerGrabStartData<FlyjaState<BackendData>>,
-    pub window: Window,
+    pub window: WindowElement,
     pub initial_window_location: Point<i32, Logical>,
 }
 

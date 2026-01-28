@@ -1,3 +1,4 @@
+pub mod element;
 mod xdg_shell;
 use smithay::{
     backend::renderer::utils::on_commit_buffer_handler,
@@ -7,6 +8,8 @@ use smithay::{
         CompositorClientState, CompositorHandler, CompositorState, get_parent, is_sync_subsurface,
     },
 };
+
+pub use element::WindowElement;
 
 use crate::state::{Backend, ClientState, FlyjaState};
 

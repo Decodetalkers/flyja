@@ -21,6 +21,7 @@ use smithay::{
 
 use crate::{
     grabs::MoveSurfaceGrab,
+    shell::WindowElement,
     state::{Backend, FlyjaState},
 };
 
@@ -68,7 +69,7 @@ impl<BackendData: Backend> XdgShellHandler for FlyjaState<BackendData> {
         &mut self.xdg_shell_state
     }
     fn new_toplevel(&mut self, surface: ToplevelSurface) {
-        let window = Window::new_wayland_window(surface.clone());
+        let window = WindowElement::new_wayland_window(surface.clone());
         self.space.map_element(window, (0, 0), true);
     }
     // TODO: later

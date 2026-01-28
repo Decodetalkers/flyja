@@ -16,12 +16,9 @@ use smithay::{
         calloop::{
             EventLoop, Interest, LoopHandle, LoopSignal, Mode, PostAction, generic::Generic,
         },
-        wayland_protocols::xdg::{
-            decoration::{
-                self as xdg_decoration,
-                zv1::server::zxdg_toplevel_decoration_v1::Mode as DecorationMode,
-            },
-            shell::server::xdg_toplevel,
+        wayland_protocols::xdg::decoration::{
+            self as xdg_decoration,
+            zv1::server::zxdg_toplevel_decoration_v1::Mode as DecorationMode,
         },
         wayland_server::{
             Display, DisplayHandle, Resource,
@@ -77,6 +74,8 @@ use smithay::{
 
 use std::sync::Arc;
 
+use crate::shell::element::WindowElement;
+
 #[derive(Default)]
 pub struct ClientState {
     pub compositor_state: CompositorClientState,
@@ -107,7 +106,7 @@ pub struct FlyjaState<BackendData: Backend + 'static> {
     pub signal: LoopSignal,
 
     // desktop
-    pub space: Space<Window>,
+    pub space: Space<WindowElement>,
     pub popups: PopupManager,
 
     // smithay state
