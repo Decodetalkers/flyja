@@ -6,7 +6,7 @@ use smithay::{
     delegate_relative_pointer, delegate_seat, delegate_shm, delegate_tablet_manager,
     delegate_text_input_manager, delegate_viewporter, delegate_virtual_keyboard_manager,
     delegate_xdg_activation, delegate_xdg_decoration, delegate_xdg_foreign,
-    desktop::{PopupKind, PopupManager, Space, Window, WindowSurfaceType},
+    desktop::{PopupKind, PopupManager, Space, WindowSurfaceType},
     input::{
         Seat, SeatHandler, SeatState,
         keyboard::XkbConfig,
@@ -71,7 +71,7 @@ use smithay::{
         xdg_foreign::{XdgForeignHandler, XdgForeignState},
     },
 };
-
+use flyja_logic::TopElementMap;
 use std::sync::Arc;
 
 use crate::shell::element::WindowElement;
@@ -107,6 +107,7 @@ pub struct FlyjaState<BackendData: Backend + 'static> {
 
     // desktop
     pub space: Space<WindowElement>,
+    pub map: TopElementMap,
     pub popups: PopupManager,
 
     // smithay state
@@ -224,6 +225,7 @@ impl<BackendData: Backend + 'static> FlyjaState<BackendData> {
             handle,
             signal,
             space: Space::default(),
+            map: TopElementMap::new(flyja_logic::SizeAndPos::default()),
             popups: PopupManager::default(),
 
             compositor_state,

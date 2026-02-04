@@ -455,11 +455,19 @@ name = "flyja"
 version = "0.1.0"
 dependencies = [
  "bitflags 2.10.0",
+ "flyja_logic",
  "profiling",
  "smithay",
  "tracing",
  "tracing-subscriber",
  "xkbcommon",
+]
+
+[[package]]
+name = "flyja_logic"
+version = "0.1.0"
+dependencies = [
+ "thiserror 2.0.18",
 ]
 
 [[package]]

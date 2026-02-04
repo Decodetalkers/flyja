@@ -1,3 +1,10 @@
+[workspace]
+resolver = "3"
+members = ["./", "./flyja_logic"]
+
+[workspace.dependencies]
+flyja_logic = { version = "0.1.0", path = "./flyja_logic" }
+
 [package]
 name = "flyja"
 version = "0.1.0"
@@ -6,6 +13,7 @@ edition = "2024"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+flyja_logic.workspace = true
 bitflags = "2.10.0"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
