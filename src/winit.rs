@@ -260,7 +260,6 @@ pub fn run_winit() {
         }
     }
 
-    std::process::Command::new("weston-terminal").spawn().ok();
     event_loop
         .run(None, &mut state, move |_| {
             // Smallvil is running
