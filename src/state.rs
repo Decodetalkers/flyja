@@ -290,6 +290,7 @@ impl<BackendData: Backend + 'static> FlyjaState<BackendData> {
 
     pub fn insert_window_new(&mut self, window_in: WindowElement) {
         let mut windows = HashMap::new();
+        // NOTE: make sure current focused id always exists
         self.map
             .insert_new(
                 window_in.id,
@@ -315,6 +316,7 @@ impl<BackendData: Backend + 'static> FlyjaState<BackendData> {
             self.space
                 .map_element(window, (pos.x as i32, pos.y as i32), true);
         }
+        self.focused_id = window_in.id;
     }
     pub fn delete_window(&mut self, window: WindowElement) {
         let mut windows = HashMap::new();
@@ -332,7 +334,12 @@ impl<BackendData: Backend + 'static> FlyjaState<BackendData> {
                 .map_element(window, (pos.x as i32, pos.y as i32), true);
         }
         // NOTE: reset
-        self.focused_id = Id::MAIN;
+        self.focused_id = self
+            .space
+            .elements()
+            .next()
+            .map(|w| w.id)
+            .unwrap_or(Id::MAIN);
     }
     pub fn remap_space(&mut self, size_and_pos: flyja_logic::SizeAndPos) {
         let mut windows = HashMap::new();
