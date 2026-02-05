@@ -15,12 +15,9 @@ use smithay::{
     output::{Mode, Output, PhysicalProperties, Subpixel},
     reexports::{calloop::EventLoop, wayland_server::Display},
     utils::{Rectangle, Transform},
-    wayland::{
-        compositor::CompositorState,
-        dmabuf::{
-            DmabufFeedback, DmabufFeedbackBuilder, DmabufGlobal, DmabufHandler, DmabufState,
-            ImportNotifier,
-        },
+    wayland::dmabuf::{
+        DmabufFeedback, DmabufFeedbackBuilder, DmabufGlobal, DmabufHandler, DmabufState,
+        ImportNotifier,
     },
 };
 
@@ -28,6 +25,7 @@ use crate::state::{Backend, FlyjaState};
 
 pub const OUTPUT_NAME: &str = "winit";
 
+#[allow(unused)]
 pub struct DmabufStateFly {
     state: DmabufState,
     global: DmabufGlobal,

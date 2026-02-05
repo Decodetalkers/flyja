@@ -82,6 +82,14 @@ use flyja_logic::Id;
 pub struct ClientState {
     pub compositor_state: CompositorClientState,
 }
+
+#[derive(Debug, Clone, Copy, Default)]
+pub enum TileState {
+    Vertical,
+    #[default]
+    Horizontal,
+}
+
 impl ClientData for ClientState {
     fn initialized(&self, _client_id: ClientId) {
         println!("initialized");
@@ -131,11 +139,13 @@ pub struct FlyjaState<BackendData: Backend + 'static> {
 
     pub cursor_status: CursorImageStatus,
     pub focused_id: Id,
+    pub tile_state: TileState,
     pub seat_name: String,
     pub seat: Seat<Self>,
     pub pointer: PointerHandle<Self>,
     pub clock: Clock<Monotonic>,
 }
+
 impl<BackendData: Backend + 'static> FlyjaState<BackendData> {
     pub fn init(
         display: Display<Self>,
@@ -251,6 +261,7 @@ impl<BackendData: Backend + 'static> FlyjaState<BackendData> {
 
             pointer,
             clock,
+            tile_state: TileState::Horizontal,
             viewporter_state,
             cursor_status: CursorImageStatus::default_named(),
             focused_id: Id::MAIN,
@@ -269,14 +280,21 @@ impl<BackendData: Backend + 'static> FlyjaState<BackendData> {
             })
     }
 
-    pub fn insert_window_new(&mut self, window_in: WindowElement) {
+    fn insert_way(&self) -> flyja_logic::InsertWay {
         use flyja_logic::InsertWay;
+        match self.tile_state {
+            TileState::Vertical => InsertWay::Vertical,
+            TileState::Horizontal => InsertWay::Horizontal,
+        }
+    }
+
+    pub fn insert_window_new(&mut self, window_in: WindowElement) {
         let mut windows = HashMap::new();
         self.map
             .insert_new(
                 window_in.id,
                 self.focused_id,
-                InsertWay::Horizontal,
+                self.insert_way(),
                 &mut |id, size_and_pos| {
                     windows.insert(id, size_and_pos);
                 },

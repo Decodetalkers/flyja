@@ -4,7 +4,7 @@ use smithay::{
         KeyState, KeyboardKeyEvent, Keycode, PointerAxisEvent, PointerButtonEvent,
     },
     input::{
-        keyboard::{FilterResult, KeyboardHandle, xkb::ModMask},
+        keyboard::{FilterResult, KeyboardHandle, Keysym, ModifiersState, xkb::ModMask},
         pointer::{AxisFrame, ButtonEvent, MotionEvent},
     },
     reexports::wayland_server::protocol::wl_surface::WlSurface,
@@ -12,7 +12,16 @@ use smithay::{
     wayland::virtual_keyboard::VirtualKeyboardHandler,
 };
 
-use crate::state::{Backend, FlyjaState};
+use crate::state::{Backend, FlyjaState, TileState};
+
+#[allow(unused)]
+#[derive(Debug)]
+enum KeyAction {
+    Quit,
+    Run(String),
+    TiteStateChange(TileState),
+    None,
+}
 
 impl<BackendData: Backend> VirtualKeyboardHandler for FlyjaState<BackendData> {
     fn on_keyboard_event(
@@ -40,19 +49,21 @@ impl<BackendData: Backend> VirtualKeyboardHandler for FlyjaState<BackendData> {
 impl<BackendData: Backend> FlyjaState<BackendData> {
     pub fn process_input_event<I: InputBackend>(&mut self, event: InputEvent<I>) {
         match event {
-            InputEvent::Keyboard { event, .. } => {
-                let serial = SERIAL_COUNTER.next_serial();
-                let time = Event::time_msec(&event);
-
-                self.seat.get_keyboard().unwrap().input::<(), _>(
-                    self,
-                    event.key_code(),
-                    event.state(),
-                    serial,
-                    time,
-                    |_, _, _| FilterResult::Forward,
-                );
-            }
+            InputEvent::Keyboard { event, .. } => match self.keyboard_key_to_action::<I>(event) {
+                KeyAction::Run(cmd) => {
+                    let mut process = std::process::Command::new(&cmd);
+                    if let Some(socket_name) = &self.socket_name {
+                        process.env("WAYLAND_DISPLAY", socket_name);
+                    }
+                    if let Err(e) = process.spawn() {
+                        tracing::error!(cmd, err = %e, "Failed to start program");
+                    }
+                }
+                KeyAction::TiteStateChange(tile) => {
+                    self.tile_state = tile;
+                }
+                _ => {}
+            },
             InputEvent::PointerMotion { .. } => {}
             InputEvent::PointerMotionAbsolute { event, .. } => {
                 let output = self.space.outputs().next().unwrap();
@@ -164,5 +175,46 @@ impl<BackendData: Backend> FlyjaState<BackendData> {
             }
             _ => {}
         }
+    }
+}
+impl<BackendData: Backend + 'static> FlyjaState<BackendData> {
+    fn keyboard_key_to_action<B: InputBackend>(&mut self, evt: B::KeyboardKeyEvent) -> KeyAction {
+        let keycode = evt.key_code();
+        let state = evt.state();
+        let serial = SERIAL_COUNTER.next_serial();
+        let time = Event::time_msec(&evt);
+        let keyboard = self.seat.get_keyboard().unwrap();
+        keyboard
+            .input(
+                self,
+                keycode,
+                state,
+                serial,
+                time,
+                |_, modifiers, handle| {
+                    let keysym = handle.modified_sym();
+                    if let KeyState::Pressed = state {
+                        let action = process_keyboard_shortcut(*modifiers, keysym);
+                        action
+                            .map(FilterResult::Intercept)
+                            .unwrap_or(FilterResult::Forward)
+                    } else {
+                        FilterResult::Forward
+                    }
+                },
+            )
+            .unwrap_or(KeyAction::None)
+    }
+}
+fn process_keyboard_shortcut(modifiers: ModifiersState, keysym: Keysym) -> Option<KeyAction> {
+    if modifiers.logo && keysym == Keysym::Return {
+        // run terminal
+        Some(KeyAction::Run("wezterm".into()))
+    } else if modifiers.logo && keysym == Keysym::v {
+        Some(KeyAction::TiteStateChange(TileState::Vertical))
+    } else if modifiers.logo && keysym == Keysym::b {
+        Some(KeyAction::TiteStateChange(TileState::Horizontal))
+    } else {
+        None
     }
 }
