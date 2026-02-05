@@ -313,6 +313,8 @@ impl<BackendData: Backend + 'static> FlyjaState<BackendData> {
             self.space
                 .map_element(window, (pos.x as i32, pos.y as i32), true);
         }
+        // NOTE: reset
+        self.focused_id = Id::MAIN;
     }
     pub fn remap_space(&mut self, size_and_pos: flyja_logic::SizeAndPos) {
         let mut windows = HashMap::new();
