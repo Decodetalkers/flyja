@@ -1,78 +1,104 @@
-use crate::state::Backend;
-use crate::CalloopData;
-use crate::FlyJa;
+use std::time::Duration;
+
+use flyja_logic::{Size, SizeAndPos};
 use smithay::{
     backend::{
+        allocator::dmabuf::Dmabuf,
+        egl::EGLDevice,
         renderer::{
-            damage::OutputDamageTracker, element::surface::WaylandSurfaceRenderElement,
-            gles::GlesRenderer,
+            ImportDma, ImportEgl, ImportMemWl, damage::OutputDamageTracker,
+            element::surface::WaylandSurfaceRenderElement, gles::GlesRenderer,
         },
-        winit::{self, WinitError, WinitEvent, WinitEventLoop, WinitGraphicsBackend},
+        winit::{self, WinitEvent, WinitGraphicsBackend},
     },
+    delegate_dmabuf,
     output::{Mode, Output, PhysicalProperties, Subpixel},
-    reexports::{
-        calloop::{
-            timer::{TimeoutAction, Timer},
-            EventLoop,
-        },
-        wayland_server::Display,
-    },
+    reexports::{calloop::EventLoop, wayland_server::Display},
     utils::{Rectangle, Transform},
+    wayland::dmabuf::{
+        DmabufFeedback, DmabufFeedbackBuilder, DmabufGlobal, DmabufHandler, DmabufState,
+        ImportNotifier,
+    },
 };
-use std::time::Duration;
+
+use crate::state::{Backend, FlyjaState};
 
 pub const OUTPUT_NAME: &str = "winit";
 
-pub struct WinitData;
+#[allow(unused)]
+pub struct DmabufStateFly {
+    state: DmabufState,
+    global: DmabufGlobal,
+    feedback: Option<DmabufFeedback>,
+    full_redraw: u8,
+}
+
+pub struct WinitData {
+    backend: WinitGraphicsBackend<GlesRenderer>,
+    damager_tracker: OutputDamageTracker,
+    dmabuf_state: DmabufStateFly,
+}
 
 impl Backend for WinitData {
+    const HAS_GUSTURES: bool = true;
+    const HAS_RELATIVE_MOTION: bool = true;
     fn seat_name(&self) -> String {
-        "Winit".to_string()
+        "winit".to_owned()
     }
 }
 
-pub fn run_winit() -> Result<(), Box<dyn std::error::Error>> {
-    let mut event_loop: EventLoop<CalloopData<WinitData>> = EventLoop::try_new()?;
+type FlyjaStateWinit = FlyjaState<WinitData>;
 
-    let mut display: Display<FlyJa<WinitData>> = Display::new()?;
-    let data = WinitData;
-    let state = FlyJa::init(data, &mut event_loop, &mut display);
-
-    let mut data = CalloopData { state, display };
-    init_winit(&mut event_loop, &mut data)?;
-
-    event_loop.run(None, &mut data, move |_| {})?;
-    Ok(())
+impl DmabufHandler for FlyjaState<WinitData> {
+    fn dmabuf_state(&mut self) -> &mut DmabufState {
+        &mut self.backend_data.dmabuf_state.state
+    }
+    fn dmabuf_imported(
+        &mut self,
+        _global: &DmabufGlobal,
+        dmabuf: Dmabuf,
+        notifier: ImportNotifier,
+    ) {
+        if self
+            .backend_data
+            .backend
+            .renderer()
+            .import_dmabuf(&dmabuf, None)
+            .is_ok()
+        {
+            let _ = notifier.successful::<Self>();
+        } else {
+            notifier.failed();
+        }
+    }
 }
 
-fn init_winit<T>(
-    event_loop: &mut EventLoop<CalloopData<T>>,
-    data: &mut CalloopData<T>,
-) -> Result<(), Box<dyn std::error::Error>>
-where
-    T: Backend + 'static,
-{
-    let display = &mut data.display;
-    let state = &mut data.state;
+delegate_dmabuf!(FlyjaState<WinitData>);
 
-    let (mut backend, mut winit) = winit::init()?;
+pub fn run_winit() {
+    let mut event_loop: EventLoop<'_, FlyjaStateWinit> = EventLoop::try_new().unwrap();
+    let display: Display<FlyjaStateWinit> = Display::new().unwrap();
+    let (mut backend, winit) = winit::init::<GlesRenderer>().unwrap();
+
+    let size = backend.window_size();
 
     let mode = Mode {
-        size: backend.window_size().physical_size,
+        size,
         refresh: 60_000,
     };
 
     let output = Output::new(
-        "winit".to_string(),
+        OUTPUT_NAME.to_string(),
         PhysicalProperties {
             size: (0, 0).into(),
             subpixel: Subpixel::Unknown,
-            make: "Flyja".into(),
-            model: "Winit".into(),
+            make: "Smithay".into(),
+            model: "winit".into(),
+            serial_number: "Unknown".into(),
         },
     );
 
-    let _global = output.create_global::<FlyJa<T>>(&display.handle());
+    let _global = output.create_global::<FlyjaState<WinitData>>(&display.handle());
     output.change_current_state(
         Some(mode),
         Some(Transform::Flipped180),
@@ -81,104 +107,163 @@ where
     );
     output.set_preferred(mode);
 
-    state.space.map_output(&output, (0, 0));
+    let render_node = EGLDevice::device_for_display(backend.renderer().egl_context().display())
+        .and_then(|device| device.try_get_render_node())
+        .unwrap_or(None);
+    let dmabuf_default_feedback = match render_node {
+        Some(node) => {
+            let dmabuf_formats = backend.renderer().dmabuf_formats();
 
-    let mut damage_tracked_renderer = OutputDamageTracker::from_output(&output);
-
-    std::env::set_var("WAYLAND_DISPLAY", &state.socket_name);
-
-    let mut full_redraw = 0u8;
-
-    let timer = Timer::immediate();
-    event_loop
-        .handle()
-        .insert_source(timer, move |_, _, data| {
-            winit_dispatch(
-                &mut backend,
-                &mut winit,
-                data,
-                &output,
-                &mut damage_tracked_renderer,
-                &mut full_redraw,
+            Some(
+                DmabufFeedbackBuilder::new(node.dev_id(), dmabuf_formats)
+                    .build()
+                    .unwrap(),
             )
-            .unwrap();
-            TimeoutAction::ToDuration(Duration::from_millis(16))
-        })?;
-
-    Ok(())
-}
-
-fn winit_dispatch<T>(
-    backend: &mut WinitGraphicsBackend<GlesRenderer>,
-    winit: &mut WinitEventLoop,
-    data: &mut CalloopData<T>,
-    output: &Output,
-    damage_tracked_renderer: &mut OutputDamageTracker,
-    full_redraw: &mut u8,
-) -> Result<(), Box<dyn std::error::Error>>
-where
-    T: Backend + 'static,
-{
-    let display = &mut data.display;
-    let state = &mut data.state;
-
-    let res = winit.dispatch_new_events(|event| match event {
-        WinitEvent::Resized { size, .. } => {
-            output.change_current_state(
-                Some(Mode {
-                    size,
-                    refresh: 60_000,
-                }),
-                None,
-                None,
-                None,
-            );
         }
-        WinitEvent::Input(event) => {
-            state.process_input_event(&display.handle(), event, OUTPUT_NAME)
-        } //state.process_input_event(event),
-        _ => (),
-    });
+        None => None,
+    };
 
-    if let Err(WinitError::WindowClosed) = res {
-        // Stop the loop
-        state.loop_signal.stop();
-
-        return Ok(());
-    } else {
-        res?;
+    let dmabuf_state = match dmabuf_default_feedback {
+        Some(default_feedback) => {
+            let mut dmabuf_state = DmabufState::new();
+            let dmabuf_global = dmabuf_state
+                .create_global_with_default_feedback::<FlyjaState<WinitData>>(
+                    &display.handle(),
+                    &default_feedback,
+                );
+            DmabufStateFly {
+                state: dmabuf_state,
+                global: dmabuf_global,
+                feedback: Some(default_feedback),
+                full_redraw: 0,
+            }
+        }
+        None => {
+            let dmabuf_formats = backend.renderer().dmabuf_formats();
+            let mut dmabuf_state = DmabufState::new();
+            let dmabuf_global = dmabuf_state
+                .create_global::<FlyjaState<WinitData>>(&display.handle(), dmabuf_formats);
+            DmabufStateFly {
+                state: dmabuf_state,
+                global: dmabuf_global,
+                feedback: None,
+                full_redraw: 0,
+            }
+        }
+    };
+    if backend
+        .renderer()
+        .bind_wl_display(&display.handle())
+        .is_ok()
+    {
+        tracing::info!("EGL hardware-acceleration enabled");
     }
 
-    *full_redraw = full_redraw.saturating_sub(1);
+    let data = {
+        let damager_tracker = OutputDamageTracker::from_output(&output);
+        WinitData {
+            backend,
+            damager_tracker,
+            dmabuf_state,
+        }
+    };
 
-    let size = backend.window_size().physical_size;
-    let damage = Rectangle::from_loc_and_size((0, 0), size);
-
-    backend.bind()?;
-    smithay::desktop::space::render_output::<_, WaylandSurfaceRenderElement<GlesRenderer>, _, _>(
-        output,
-        backend.renderer(),
-        1.0,
-        0,
-        [&state.space],
-        &[],
-        damage_tracked_renderer,
-        [0.1, 0.1, 0.1, 1.0],
-    )?;
-    backend.submit(Some(&[damage]))?;
-
-    state.space.elements().for_each(|window| {
-        window.send_frame(
-            output,
-            state.start_time.elapsed(),
-            Some(Duration::ZERO),
-            |_, _| Some(output.clone()),
-        )
+    let mut state = FlyjaState::init(display, &event_loop, data, true);
+    state
+        .shm_state
+        .update_formats(state.backend_data.backend.renderer().shm_formats());
+    state.space.map_output(&output, (0, 0));
+    state.remap_space(SizeAndPos {
+        size: Size {
+            width: 0.,
+            height: 0.,
+        },
+        position: flyja_logic::Position { x: 0., y: 0. },
     });
 
-    state.space.refresh();
-    state.popups.cleanup();
-    display.flush_clients()?;
+    event_loop
+        .handle()
+        .insert_source(winit, move |event, _, state| {
+            match event {
+                WinitEvent::Resized { size, .. } => {
+                    output.change_current_state(
+                        Some(Mode {
+                            size,
+                            refresh: 60_000,
+                        }),
+                        None,
+                        None,
+                        None,
+                    );
+                    state.remap_space(SizeAndPos {
+                        size: Size {
+                            width: size.w as f32,
+                            height: size.h as f32,
+                        },
+                        position: flyja_logic::Position { x: 0., y: 0. },
+                    });
+                }
+                WinitEvent::Input(event) => state.process_input_event(event),
+                WinitEvent::Redraw => {
+                    let backend = &mut state.backend_data.backend;
+                    let size = backend.window_size();
+                    let damage = Rectangle::from_size(size);
 
-    Ok(())
+                    {
+                        let (renderer, mut framebuffer) = backend.bind().unwrap();
+                        smithay::desktop::space::render_output::<
+                            _,
+                            WaylandSurfaceRenderElement<GlesRenderer>,
+                            _,
+                            _,
+                        >(
+                            &output,
+                            renderer,
+                            &mut framebuffer,
+                            1.0,
+                            0,
+                            [&state.space],
+                            &[],
+                            &mut state.backend_data.damager_tracker,
+                            [0.1, 0.1, 0.1, 1.0],
+                        )
+                        .unwrap();
+                    }
+                    backend.submit(Some(&[damage])).unwrap();
+
+                    state.space.elements().for_each(|window| {
+                        window.send_frame(
+                            &output,
+                            state.start_time.elapsed(),
+                            Some(Duration::ZERO),
+                            |_, _| Some(output.clone()),
+                        )
+                    });
+
+                    state.space.refresh();
+                    state.popups.cleanup();
+                    let _ = state.display_handle.flush_clients();
+
+                    // Ask for redraw to schedule new frame.
+                    backend.window().request_redraw();
+                }
+                WinitEvent::CloseRequested => {
+                    state.signal.stop();
+                }
+                _ => (),
+            }
+        })
+        .unwrap();
+    if let Some(socket_name) = &state.socket_name {
+        unsafe {
+            std::env::set_var("WAYLAND_DISPLAY", socket_name);
+        }
+    }
+
+    std::process::Command::new("weston-terminal").spawn().ok();
+    event_loop
+        .run(None, &mut state, move |_| {
+            // Smallvil is running
+        })
+        .unwrap();
 }
