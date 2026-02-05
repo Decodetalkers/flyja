@@ -1,3 +1,4 @@
+use flyja_logic::TopElementMap;
 use smithay::{
     backend::input::TabletToolDescriptor,
     delegate_commit_timing, delegate_data_device, delegate_ext_data_control,
@@ -23,13 +24,13 @@ use smithay::{
         wayland_server::{
             Display, DisplayHandle, Resource,
             backend::{ClientData, ClientId, DisconnectReason},
-            protocol::{wl_buffer::WlBuffer, wl_seat::WlSeat, wl_surface::WlSurface},
+            protocol::{wl_buffer::WlBuffer, wl_surface::WlSurface},
         },
     },
     utils::{Clock, Logical, Monotonic, Point, Rectangle},
     wayland::{
         buffer::BufferHandler,
-        commit_timing::{CommitTimerState, CommitTimingManagerState},
+        commit_timing::CommitTimingManagerState,
         compositor::{CompositorClientState, CompositorState},
         input_method::{
             InputMethodHandler, InputMethodManagerState, PopupSurface as ImPopupSurface,
@@ -71,10 +72,11 @@ use smithay::{
         xdg_foreign::{XdgForeignHandler, XdgForeignState},
     },
 };
-use flyja_logic::TopElementMap;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use crate::shell::element::WindowElement;
+
+use flyja_logic::Id;
 
 #[derive(Default)]
 pub struct ClientState {
@@ -107,6 +109,7 @@ pub struct FlyjaState<BackendData: Backend + 'static> {
 
     // desktop
     pub space: Space<WindowElement>,
+    pub pedding_windows: Vec<WindowElement>,
     pub map: TopElementMap,
     pub popups: PopupManager,
 
@@ -127,6 +130,7 @@ pub struct FlyjaState<BackendData: Backend + 'static> {
     pub keyboard_shortcuts_inhibit_state: KeyboardShortcutsInhibitState,
 
     pub cursor_status: CursorImageStatus,
+    pub focused_id: Id,
     pub seat_name: String,
     pub seat: Seat<Self>,
     pub pointer: PointerHandle<Self>,
@@ -225,6 +229,7 @@ impl<BackendData: Backend + 'static> FlyjaState<BackendData> {
             handle,
             signal,
             space: Space::default(),
+            pedding_windows: Vec::new(),
             map: TopElementMap::new(flyja_logic::SizeAndPos::default()),
             popups: PopupManager::default(),
 
@@ -248,6 +253,7 @@ impl<BackendData: Backend + 'static> FlyjaState<BackendData> {
             clock,
             viewporter_state,
             cursor_status: CursorImageStatus::default_named(),
+            focused_id: Id::MAIN,
         }
     }
     pub fn surface_under(
@@ -261,6 +267,66 @@ impl<BackendData: Backend + 'static> FlyjaState<BackendData> {
                     .surface_under(pos - location.to_f64(), WindowSurfaceType::ALL)
                     .map(|(s, p)| (s, (p + location).to_f64()))
             })
+    }
+
+    pub fn insert_window_new(&mut self, window_in: WindowElement) {
+        use flyja_logic::InsertWay;
+        let mut windows = HashMap::new();
+        self.map
+            .insert_new(
+                window_in.id,
+                self.focused_id,
+                InsertWay::Horizontal,
+                &mut |id, size_and_pos| {
+                    windows.insert(id, size_and_pos);
+                },
+            )
+            .unwrap();
+
+        for (id, size_and_pos) in windows.iter() {
+            // NOTE: because there must be a new window here, so if not , it should be that new one
+            let window = self
+                .space
+                .elements()
+                .find(|w| w.id == *id)
+                .cloned()
+                .unwrap_or(window_in.clone());
+            window.set_geometry(size_and_pos.size);
+            let pos = size_and_pos.position;
+            window.resize(size_and_pos.size);
+            self.space
+                .map_element(window, (pos.x as i32, pos.y as i32), true);
+        }
+    }
+    pub fn delete_window(&mut self, window: WindowElement) {
+        let mut windows = HashMap::new();
+        self.map
+            .delete(window.id, &mut |id, size_and_pos| {
+                windows.insert(id, size_and_pos);
+            })
+            .unwrap();
+        for (id, size_and_pos) in windows.iter() {
+            let window = self.space.elements().find(|w| w.id == *id).unwrap().clone();
+            window.set_geometry(size_and_pos.size);
+            let pos = size_and_pos.position;
+            window.resize(size_and_pos.size);
+            self.space
+                .map_element(window, (pos.x as i32, pos.y as i32), true);
+        }
+    }
+    pub fn remap_space(&mut self, size_and_pos: flyja_logic::SizeAndPos) {
+        let mut windows = HashMap::new();
+        self.map.remap(size_and_pos, &mut |id, size_and_pos| {
+            windows.insert(id, size_and_pos);
+        });
+        for (id, size_and_pos) in windows.iter() {
+            let window = self.space.elements().find(|w| w.id == *id).unwrap().clone();
+            window.set_geometry(size_and_pos.size);
+            let pos = size_and_pos.position;
+            window.resize(size_and_pos.size);
+            self.space
+                .map_element(window, (pos.x as i32, pos.y as i32), true);
+        }
     }
 }
 
@@ -307,11 +373,18 @@ impl<BackendData: Backend> SeatHandler for FlyjaState<BackendData> {
         self.cursor_status = image
     }
 
-    // TODO: adjust later
     fn focus_changed(&mut self, seat: &Seat<Self>, target: Option<&Self::KeyboardFocus>) {
         let dh = &self.display_handle;
 
         let wl_surface = target.and_then(WaylandFocus::wl_surface);
+        if let Some(id) = self
+            .space
+            .elements()
+            .find(|w| w.wl_surface() == wl_surface)
+            .map(|w| w.id)
+        {
+            self.focused_id = id;
+        }
 
         let focus = wl_surface.and_then(|s| dh.get_client(s.id()).ok());
         set_data_device_focus(dh, seat, focus.clone());

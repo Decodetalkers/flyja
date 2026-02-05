@@ -1,4 +1,4 @@
-use std::{collections::HashMap, time::Duration};
+use std::time::Duration;
 
 use flyja_logic::{Size, SizeAndPos};
 use smithay::{
@@ -175,16 +175,13 @@ pub fn run_winit() {
         .shm_state
         .update_formats(state.backend_data.backend.renderer().shm_formats());
     state.space.map_output(&output, (0, 0));
-    state.map.remap(
-        SizeAndPos {
-            size: Size {
-                width: 0.,
-                height: 0.,
-            },
-            position: flyja_logic::Position { x: 0., y: 0. },
+    state.remap_space(SizeAndPos {
+        size: Size {
+            width: 0.,
+            height: 0.,
         },
-        &mut (),
-    );
+        position: flyja_logic::Position { x: 0., y: 0. },
+    });
 
     event_loop
         .handle()
@@ -200,33 +197,13 @@ pub fn run_winit() {
                         None,
                         None,
                     );
-                    let mut windows = HashMap::new();
-                    state.map.remap(
-                        SizeAndPos {
-                            size: Size {
-                                width: size.w as f32,
-                                height: size.h as f32,
-                            },
-                            position: flyja_logic::Position { x: 0., y: 0. },
+                    state.remap_space(SizeAndPos {
+                        size: Size {
+                            width: size.w as f32,
+                            height: size.h as f32,
                         },
-                        &mut |id, size_and_pos| {
-                            windows.insert(id, size_and_pos);
-                        },
-                    );
-                    for (id, size_and_pos) in windows.iter() {
-                        let window = state
-                            .space
-                            .elements()
-                            .find(|w| w.id == *id)
-                            .unwrap()
-                            .clone();
-                        window.set_geometry(size_and_pos.size);
-                        let pos = size_and_pos.position;
-                        window.resize(size_and_pos.size);
-                        state
-                            .space
-                            .map_element(window, (pos.x as i32, pos.y as i32), true);
-                    }
+                        position: flyja_logic::Position { x: 0., y: 0. },
+                    });
                 }
                 WinitEvent::Input(event) => state.process_input_event(event),
                 WinitEvent::Redraw => {

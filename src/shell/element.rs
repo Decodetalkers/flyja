@@ -86,6 +86,8 @@ impl WindowElement {
     pub fn set_geometry(&self, size: FlSize) {
         self.state_mut().geometry = size;
     }
+
+    #[allow(unused)]
     pub fn set_ssd(&self, is_ssd: bool) {
         self.state_mut().is_ssd = is_ssd;
     }

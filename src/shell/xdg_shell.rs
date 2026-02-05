@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use smithay::{
     delegate_xdg_shell,
     desktop::PopupKind,
@@ -21,7 +19,7 @@ use smithay::{
     },
 };
 
-use flyja_logic::{Id, InsertWay};
+use flyja_logic::Id;
 
 use crate::{
     grabs::MoveSurfaceGrab,
@@ -31,11 +29,24 @@ use crate::{
 
 impl<BackendData: Backend> FlyjaState<BackendData> {
     pub fn handle_xdg_commit(&mut self, surface: &WlSurface) {
-        let window_try = self
-            .space
-            .elements()
-            .find(|w| w.toplevel().unwrap().wl_surface() == surface)
-            .cloned();
+        let window_try_pedding = self
+            .pedding_windows
+            .iter()
+            .enumerate()
+            .find(|(_, w)| w.toplevel().unwrap().wl_surface() == surface)
+            .map(|(index, w)| (index, w.clone()));
+        let window_try = match window_try_pedding {
+            Some((index, window)) => {
+                self.pedding_windows.remove(index);
+
+                Some(window)
+            }
+            None => self
+                .space
+                .elements()
+                .find(|w| w.toplevel().unwrap().wl_surface() == surface)
+                .cloned(),
+        };
         if let Some(window) = window_try {
             let initial_configure_sent = with_states(surface, |states| {
                 states
@@ -50,28 +61,7 @@ impl<BackendData: Backend> FlyjaState<BackendData> {
             if !initial_configure_sent {
                 window.toplevel().unwrap().send_configure();
 
-                let mut windows = HashMap::new();
-                // TODO: move the logic to state
-                self.map
-                    .insert_new(
-                        window.id,
-                        // TODO: make it the focused
-                        Id(0),
-                        InsertWay::Horizontal,
-                        &mut |id, size_and_pos| {
-                            windows.insert(id, size_and_pos);
-                        },
-                    )
-                    .unwrap();
-
-                for (id, size_and_pos) in windows.iter() {
-                    let window = self.space.elements().find(|w| w.id == *id).unwrap().clone();
-                    window.set_geometry(size_and_pos.size);
-                    let pos = size_and_pos.position;
-                    window.resize(size_and_pos.size);
-                    self.space
-                        .map_element(window, (pos.x as i32, pos.y as i32), true);
-                }
+                self.insert_window_new(window);
             }
         }
         self.popups.commit(surface);
@@ -98,7 +88,7 @@ impl<BackendData: Backend> XdgShellHandler for FlyjaState<BackendData> {
     fn new_toplevel(&mut self, surface: ToplevelSurface) {
         let id = Id::unique();
         let window = WindowElement::new_wayland_window(id, surface.clone());
-        self.space.map_element(window, (0, 0), true);
+        self.pedding_windows.push(window);
     }
     fn toplevel_destroyed(&mut self, surface: ToplevelSurface) {
         let window = self
@@ -107,20 +97,8 @@ impl<BackendData: Backend> XdgShellHandler for FlyjaState<BackendData> {
             .find(|w| w.toplevel().unwrap().wl_surface() == surface.wl_surface())
             .unwrap()
             .clone();
-        let mut windows = HashMap::new();
-        self.map
-            .delete(window.id, &mut |id, size_and_pos| {
-                windows.insert(id, size_and_pos);
-            })
-            .unwrap();
-        for (id, size_and_pos) in windows.iter() {
-            let window = self.space.elements().find(|w| w.id == *id).unwrap().clone();
-            window.set_geometry(size_and_pos.size);
-            let pos = size_and_pos.position;
-            window.resize(size_and_pos.size);
-            self.space
-                .map_element(window, (pos.x as i32, pos.y as i32), true);
-        }
+
+        self.delete_window(window);
     }
     // TODO: later
     fn new_popup(&mut self, _surface: PopupSurface, _positioner: PositionerState) {}
