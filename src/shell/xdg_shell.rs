@@ -5,16 +5,20 @@ use smithay::{
         Seat,
         pointer::{Focus, GrabStartData as PointerGrabStartData},
     },
-    reexports::wayland_server::{
-        Resource,
-        protocol::{wl_seat::WlSeat, wl_surface::WlSurface},
+    reexports::{
+        wayland_protocols::xdg::decoration as xdg_decoration,
+        wayland_server::{
+            Resource,
+            protocol::{wl_seat::WlSeat, wl_surface::WlSurface},
+        },
     },
     utils::Serial,
     wayland::{
         compositor::with_states,
+        seat::WaylandFocus,
         shell::xdg::{
-            PopupSurface, PositionerState, ToplevelSurface, XdgShellHandler, XdgShellState,
-            XdgToplevelSurfaceData,
+            Configure, PopupSurface, PositionerState, ToplevelSurface, XdgShellHandler,
+            XdgShellState, XdgToplevelSurfaceData,
         },
     },
 };
@@ -28,6 +32,19 @@ use crate::{
 };
 
 impl<BackendData: Backend> FlyjaState<BackendData> {
+    fn find_window(&self, surface: &WlSurface) -> Option<&WindowElement> {
+        let mut window_try = self
+            .pedding_windows
+            .iter()
+            .find(|w| w.wl_surface().as_deref() == Some(surface));
+        if window_try.is_none() {
+            window_try = self
+                .space
+                .elements()
+                .find(|w| w.wl_surface().as_deref() == Some(surface));
+        }
+        window_try
+    }
     pub fn handle_xdg_commit(&mut self, surface: &WlSurface) {
         let window_try_pedding = self
             .pedding_windows
@@ -136,6 +153,21 @@ impl<BackendData: Backend> XdgShellHandler for FlyjaState<BackendData> {
 
             pointer.set_grab(self, grab, serial, Focus::Clear);
         }
+    }
+    fn ack_configure(&mut self, surface: WlSurface, configure: Configure) {
+        let Configure::Toplevel(configure) = configure else {
+            return;
+        };
+        let Some(window) = self.find_window(&surface) else {
+            return;
+        };
+        use xdg_decoration::zv1::server::zxdg_toplevel_decoration_v1::Mode;
+        let is_ssd = configure
+            .state
+            .decoration_mode
+            .map(|mode| mode == Mode::ServerSide)
+            .unwrap_or(false);
+        window.set_ssd(is_ssd);
     }
 }
 
