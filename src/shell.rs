@@ -28,11 +28,7 @@ impl<BackendData: Backend> CompositorHandler for FlyjaState<BackendData> {
             while let Some(parent) = get_parent(&root) {
                 root = parent;
             }
-            if let Some(window) = self
-                .space
-                .elements()
-                .find(|w| w.toplevel().unwrap().wl_surface() == &root)
-            {
+            if let Some(window) = self.find_window(surface) {
                 window.on_commit();
             }
         };

@@ -32,14 +32,20 @@ use crate::{
 };
 
 impl<BackendData: Backend> FlyjaState<BackendData> {
-    fn find_window(&self, surface: &WlSurface) -> Option<&WindowElement> {
+    pub fn find_window(&self, surface: &WlSurface) -> Option<&WindowElement> {
         let mut window_try = self
             .pedding_windows
             .iter()
             .find(|w| w.wl_surface().as_deref() == Some(surface));
         if window_try.is_none() {
             window_try = self
-                .space
+                .tile_space
+                .elements()
+                .find(|w| w.wl_surface().as_deref() == Some(surface));
+        }
+        if window_try.is_none() {
+            window_try = self
+                .slack_space
                 .elements()
                 .find(|w| w.wl_surface().as_deref() == Some(surface));
         }
@@ -59,7 +65,7 @@ impl<BackendData: Backend> FlyjaState<BackendData> {
                 Some(window)
             }
             None => self
-                .space
+                .tile_space
                 .elements()
                 .find(|w| w.toplevel().unwrap().wl_surface() == surface)
                 .cloned(),
@@ -78,7 +84,10 @@ impl<BackendData: Backend> FlyjaState<BackendData> {
             if !initial_configure_sent {
                 window.toplevel().unwrap().send_configure();
 
-                self.insert_window_new(window);
+                if !window.mapped() {
+                    window.state_mut().mapped = true;
+                    self.insert_window_new(window);
+                }
             }
         }
         self.popups.commit(surface);
@@ -109,7 +118,7 @@ impl<BackendData: Backend> XdgShellHandler for FlyjaState<BackendData> {
     }
     fn toplevel_destroyed(&mut self, surface: ToplevelSurface) {
         let window = self
-            .space
+            .tile_space
             .elements()
             .find(|w| w.toplevel().unwrap().wl_surface() == surface.wl_surface())
             .unwrap()
@@ -138,12 +147,12 @@ impl<BackendData: Backend> XdgShellHandler for FlyjaState<BackendData> {
             let pointer = seat.get_pointer().unwrap();
 
             let window = self
-                .space
+                .tile_space
                 .elements()
                 .find(|w| w.toplevel().unwrap().wl_surface() == wl_surface)
                 .unwrap()
                 .clone();
-            let initial_window_location = self.space.element_location(&window).unwrap();
+            let initial_window_location = self.tile_space.element_location(&window).unwrap();
 
             let grab = MoveSurfaceGrab {
                 start_data,

@@ -29,6 +29,7 @@ pub struct WindowState {
     pub is_ssd: bool,
     // This is used when it is shown on tile space
     pub geometry: FlSize,
+    pub mapped: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -60,6 +61,7 @@ impl WindowElement {
                     width: 0.,
                     height: 0.,
                 },
+                mapped: false,
             })
         });
         self.user_data()
@@ -76,6 +78,7 @@ impl WindowElement {
                     width: 0.,
                     height: 0.,
                 },
+                mapped: false,
             })
         });
         self.user_data()
@@ -85,6 +88,10 @@ impl WindowElement {
     }
     pub fn set_geometry(&self, size: FlSize) {
         self.state_mut().geometry = size;
+    }
+
+    pub fn mapped(&self) -> bool {
+        self.state().mapped
     }
 
     pub fn set_ssd(&self, is_ssd: bool) {

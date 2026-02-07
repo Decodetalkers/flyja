@@ -66,9 +66,9 @@ impl<BackendData: Backend> FlyjaState<BackendData> {
             },
             InputEvent::PointerMotion { .. } => {}
             InputEvent::PointerMotionAbsolute { event, .. } => {
-                let output = self.space.outputs().next().unwrap();
+                let output = self.tile_space.outputs().next().unwrap();
 
-                let output_geo = self.space.output_geometry(output).unwrap();
+                let output_geo = self.tile_space.output_geometry(output).unwrap();
 
                 let pos = event.position_transformed(output_geo.size) + output_geo.loc.to_f64();
 
@@ -101,21 +101,21 @@ impl<BackendData: Backend> FlyjaState<BackendData> {
 
                 if ButtonState::Pressed == button_state && !pointer.is_grabbed() {
                     if let Some((window, _loc)) = self
-                        .space
+                        .tile_space
                         .element_under(pointer.current_location())
                         .map(|(w, l)| (w.clone(), l))
                     {
-                        self.space.raise_element(&window, true);
+                        self.tile_space.raise_element(&window, true);
                         keyboard.set_focus(
                             self,
                             Some(window.toplevel().unwrap().wl_surface().clone()),
                             serial,
                         );
-                        self.space.elements().for_each(|window| {
+                        self.tile_space.elements().for_each(|window| {
                             window.toplevel().unwrap().send_pending_configure();
                         });
                     } else {
-                        self.space.elements().for_each(|window| {
+                        self.tile_space.elements().for_each(|window| {
                             window.set_activated(false);
                             window.toplevel().unwrap().send_pending_configure();
                         });

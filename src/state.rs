@@ -116,7 +116,8 @@ pub struct FlyjaState<BackendData: Backend + 'static> {
     pub signal: LoopSignal,
 
     // desktop
-    pub space: Space<WindowElement>,
+    pub tile_space: Space<WindowElement>,
+    pub slack_space: Space<WindowElement>,
     pub pedding_windows: Vec<WindowElement>,
     pub map: TopElementMap,
     pub popups: PopupManager,
@@ -238,7 +239,8 @@ impl<BackendData: Backend + 'static> FlyjaState<BackendData> {
             socket_name,
             handle,
             signal,
-            space: Space::default(),
+            tile_space: Space::default(),
+            slack_space: Space::default(),
             pedding_windows: Vec::new(),
             map: TopElementMap::new(flyja_logic::SizeAndPos::default()),
             popups: PopupManager::default(),
@@ -271,7 +273,7 @@ impl<BackendData: Backend + 'static> FlyjaState<BackendData> {
         &self,
         pos: Point<f64, Logical>,
     ) -> Option<(WlSurface, Point<f64, Logical>)> {
-        self.space
+        self.tile_space
             .element_under(pos)
             .and_then(|(window, location)| {
                 window
@@ -291,6 +293,7 @@ impl<BackendData: Backend + 'static> FlyjaState<BackendData> {
     pub fn insert_window_new(&mut self, window_in: WindowElement) {
         let mut windows = HashMap::new();
         // NOTE: make sure current focused id always exists
+        println!("{}, {}", window_in.id, self.focused_id);
         self.map
             .insert_new(
                 window_in.id,
@@ -305,7 +308,7 @@ impl<BackendData: Backend + 'static> FlyjaState<BackendData> {
         for (id, size_and_pos) in windows.iter() {
             // NOTE: because there must be a new window here, so if not , it should be that new one
             let window = self
-                .space
+                .tile_space
                 .elements()
                 .find(|w| w.id == *id)
                 .cloned()
@@ -313,7 +316,7 @@ impl<BackendData: Backend + 'static> FlyjaState<BackendData> {
             window.set_geometry(size_and_pos.size);
             let pos = size_and_pos.position;
             window.resize(size_and_pos.size);
-            self.space
+            self.tile_space
                 .map_element(window, (pos.x as i32, pos.y as i32), true);
         }
         self.focused_id = window_in.id;
@@ -326,16 +329,21 @@ impl<BackendData: Backend + 'static> FlyjaState<BackendData> {
             })
             .unwrap();
         for (id, size_and_pos) in windows.iter() {
-            let window = self.space.elements().find(|w| w.id == *id).unwrap().clone();
+            let window = self
+                .tile_space
+                .elements()
+                .find(|w| w.id == *id)
+                .unwrap()
+                .clone();
             window.set_geometry(size_and_pos.size);
             let pos = size_and_pos.position;
             window.resize(size_and_pos.size);
-            self.space
+            self.tile_space
                 .map_element(window, (pos.x as i32, pos.y as i32), true);
         }
         // NOTE: reset
         self.focused_id = self
-            .space
+            .tile_space
             .elements()
             .next()
             .map(|w| w.id)
@@ -347,11 +355,16 @@ impl<BackendData: Backend + 'static> FlyjaState<BackendData> {
             windows.insert(id, size_and_pos);
         });
         for (id, size_and_pos) in windows.iter() {
-            let window = self.space.elements().find(|w| w.id == *id).unwrap().clone();
+            let window = self
+                .tile_space
+                .elements()
+                .find(|w| w.id == *id)
+                .unwrap()
+                .clone();
             window.set_geometry(size_and_pos.size);
             let pos = size_and_pos.position;
             window.resize(size_and_pos.size);
-            self.space
+            self.tile_space
                 .map_element(window, (pos.x as i32, pos.y as i32), true);
         }
     }
@@ -405,7 +418,7 @@ impl<BackendData: Backend> SeatHandler for FlyjaState<BackendData> {
 
         let wl_surface = target.and_then(WaylandFocus::wl_surface);
         if let Some(id) = self
-            .space
+            .tile_space
             .elements()
             .find(|w| w.wl_surface() == wl_surface)
             .map(|w| w.id)
@@ -503,12 +516,12 @@ impl<BackendData: Backend> XdgActivationHandler for FlyjaState<BackendData> {
         if token_data.timestamp.elapsed().as_secs() < 10 {
             // Just grant the wish
             let w = self
-                .space
+                .tile_space
                 .elements()
                 .find(|window| window.wl_surface().map(|s| *s == surface).unwrap_or(false))
                 .cloned();
             if let Some(window) = w {
-                self.space.raise_element(&window, true);
+                self.tile_space.raise_element(&window, true);
             }
         }
     }
@@ -539,7 +552,7 @@ impl<BackendData: Backend> InputMethodHandler for FlyjaState<BackendData> {
     }
 
     fn parent_geometry(&self, parent: &WlSurface) -> Rectangle<i32, smithay::utils::Logical> {
-        self.space
+        self.tile_space
             .elements()
             .find_map(|window| {
                 (window.wl_surface().as_deref() == Some(parent)).then(|| window.geometry())
@@ -592,7 +605,7 @@ impl<BackendData: Backend> PointerConstraintsHandler for FlyjaState<BackendData>
             constraint.is_some_and(|c| c.is_active())
         }) {
             let origin = self
-                .space
+                .tile_space
                 .elements()
                 .find_map(|window| {
                     (window.wl_surface().as_deref() == Some(surface)).then(|| window.geometry())

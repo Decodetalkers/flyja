@@ -33,7 +33,7 @@ impl<BackendData: Backend + 'static> PointerGrab<FlyjaState<BackendData>>
 
         let delta = event.location - self.start_data.location;
         let new_location = self.initial_window_location.to_f64() + delta;
-        data.space
+        data.tile_space
             .map_element(self.window.clone(), new_location.to_i32_round(), true);
     }
 
