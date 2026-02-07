@@ -13,7 +13,10 @@ use smithay::{
     },
     delegate_dmabuf,
     output::{Mode, Output, PhysicalProperties, Subpixel},
-    reexports::{calloop::EventLoop, wayland_server::Display},
+    reexports::{
+        calloop::EventLoop,
+        wayland_server::{Display, protocol::wl_surface::WlSurface},
+    },
     utils::{Rectangle, Transform},
     wayland::dmabuf::{
         DmabufFeedback, DmabufFeedbackBuilder, DmabufGlobal, DmabufHandler, DmabufState,
@@ -26,7 +29,7 @@ use crate::state::{Backend, FlyjaState};
 pub const OUTPUT_NAME: &str = "winit";
 
 #[allow(unused)]
-pub struct DmabufStateFly {
+struct DmabufStateFly {
     state: DmabufState,
     global: DmabufGlobal,
     feedback: Option<DmabufFeedback>,
@@ -45,6 +48,9 @@ impl Backend for WinitData {
     fn seat_name(&self) -> String {
         "winit".to_owned()
     }
+    fn early_import(&mut self, _surface: &WlSurface) {}
+    fn reset_buffers(&mut self, _output: &Output) {}
+    fn update_led_state(&mut self, _led_state: smithay::input::keyboard::LedState) {}
 }
 
 type FlyjaStateWinit = FlyjaState<WinitData>;

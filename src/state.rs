@@ -10,7 +10,7 @@ use smithay::{
     desktop::{PopupKind, PopupManager, Space, WindowSurfaceType},
     input::{
         Seat, SeatHandler, SeatState,
-        keyboard::XkbConfig,
+        keyboard::{XkbConfig, LedState},
         pointer::{CursorImageStatus, PointerHandle},
     },
     reexports::{
@@ -27,6 +27,7 @@ use smithay::{
             protocol::{wl_buffer::WlBuffer, wl_surface::WlSurface},
         },
     },
+    output::Output,
     utils::{Clock, Logical, Monotonic, Point, Rectangle},
     wayland::{
         buffer::BufferHandler,
@@ -120,6 +121,10 @@ pub trait Backend {
     const HAS_RELATIVE_MOTION: bool = false;
     const HAS_GUSTURES: bool = false;
     fn seat_name(&self) -> String;
+
+    fn reset_buffers(&mut self, output: &Output);
+    fn early_import(&mut self, surface: &WlSurface);
+    fn update_led_state(&mut self, led_state: LedState);
 }
 
 pub struct FlyjaState<BackendData: Backend + 'static> {
