@@ -47,7 +47,7 @@ use smithay::{
         relative_pointer::RelativePointerManagerState,
         seat::WaylandFocus,
         selection::{
-            SelectionHandler, SelectionSource, SelectionTarget,
+            SelectionHandler,
             data_device::{
                 DataDeviceHandler, DataDeviceState, WaylandDndGrabHandler, set_data_device_focus,
             },
@@ -57,7 +57,7 @@ use smithay::{
             },
         },
         shell::xdg::{
-            PopupSurface, PositionerState, ToplevelSurface, XdgShellHandler, XdgShellState,
+            ToplevelSurface, XdgShellState,
             decoration::{XdgDecorationHandler, XdgDecorationState},
         },
         shm::{ShmHandler, ShmState},

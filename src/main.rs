@@ -5,6 +5,7 @@ mod input_handler;
 mod shell;
 mod state;
 mod winit;
+mod udev;
 fn main() {
     tracing_subscriber::fmt().init();
     run_winit();
