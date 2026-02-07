@@ -20,6 +20,7 @@ enum KeyAction {
     Quit,
     Run(String),
     TiteStateChange(TileState),
+    ModeChange,
     None,
 }
 
@@ -62,6 +63,9 @@ impl<BackendData: Backend> FlyjaState<BackendData> {
                 KeyAction::TiteStateChange(tile) => {
                     self.tile_state = tile;
                 }
+                KeyAction::ModeChange => {
+                    self.map_mode.switch();
+                }
                 _ => {}
             },
             InputEvent::PointerMotion { .. } => {}
@@ -101,6 +105,20 @@ impl<BackendData: Backend> FlyjaState<BackendData> {
 
                 if ButtonState::Pressed == button_state && !pointer.is_grabbed() {
                     if let Some((window, _loc)) = self
+                        .slack_space
+                        .element_under(pointer.current_location())
+                        .map(|(w, l)| (w.clone(), l))
+                    {
+                        self.slack_space.raise_element(&window, true);
+                        keyboard.set_focus(
+                            self,
+                            Some(window.toplevel().unwrap().wl_surface().clone()),
+                            serial,
+                        );
+                        self.slack_space.elements().for_each(|window| {
+                            window.toplevel().unwrap().send_pending_configure();
+                        });
+                    } else if let Some((window, _loc)) = self
                         .tile_space
                         .element_under(pointer.current_location())
                         .map(|(w, l)| (w.clone(), l))
@@ -116,6 +134,10 @@ impl<BackendData: Backend> FlyjaState<BackendData> {
                         });
                     } else {
                         self.tile_space.elements().for_each(|window| {
+                            window.set_activated(false);
+                            window.toplevel().unwrap().send_pending_configure();
+                        });
+                        self.slack_space.elements().for_each(|window| {
                             window.set_activated(false);
                             window.toplevel().unwrap().send_pending_configure();
                         });
@@ -214,6 +236,8 @@ fn process_keyboard_shortcut(modifiers: ModifiersState, keysym: Keysym) -> Optio
         Some(KeyAction::TiteStateChange(TileState::Vertical))
     } else if modifiers.logo && keysym == Keysym::b {
         Some(KeyAction::TiteStateChange(TileState::Horizontal))
+    } else if modifiers.logo && keysym == Keysym::p {
+        Some(KeyAction::ModeChange)
     } else {
         None
     }

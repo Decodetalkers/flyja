@@ -12,14 +12,14 @@ use smithay::{
 use crate::shell::element::WindowElement;
 use crate::state::{Backend, FlyjaState};
 
-pub struct MoveSurfaceGrab<BackendData: Backend + 'static> {
+pub struct MoveSurfaceGrabSlack<BackendData: Backend + 'static> {
     pub start_data: PointerGrabStartData<FlyjaState<BackendData>>,
     pub window: WindowElement,
     pub initial_window_location: Point<i32, Logical>,
 }
 
 impl<BackendData: Backend + 'static> PointerGrab<FlyjaState<BackendData>>
-    for MoveSurfaceGrab<BackendData>
+    for MoveSurfaceGrabSlack<BackendData>
 {
     fn motion(
         &mut self,
@@ -33,7 +33,7 @@ impl<BackendData: Backend + 'static> PointerGrab<FlyjaState<BackendData>>
 
         let delta = event.location - self.start_data.location;
         let new_location = self.initial_window_location.to_f64() + delta;
-        data.tile_space
+        data.slack_space
             .map_element(self.window.clone(), new_location.to_i32_round(), true);
     }
 

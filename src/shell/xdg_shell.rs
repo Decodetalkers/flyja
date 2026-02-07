@@ -26,13 +26,13 @@ use smithay::{
 use flyja_logic::Id;
 
 use crate::{
-    grabs::MoveSurfaceGrab,
+    grabs::MoveSurfaceGrabSlack,
     shell::WindowElement,
-    state::{Backend, FlyjaState},
+    state::{Backend, FlyjaState, MapMode},
 };
 
 impl<BackendData: Backend> FlyjaState<BackendData> {
-    pub fn find_window(&self, surface: &WlSurface) -> Option<&WindowElement> {
+    pub fn find_window_with_pedding(&self, surface: &WlSurface) -> Option<&WindowElement> {
         let mut window_try = self
             .pedding_windows
             .iter()
@@ -43,6 +43,19 @@ impl<BackendData: Backend> FlyjaState<BackendData> {
                 .elements()
                 .find(|w| w.wl_surface().as_deref() == Some(surface));
         }
+        if window_try.is_none() {
+            window_try = self
+                .slack_space
+                .elements()
+                .find(|w| w.wl_surface().as_deref() == Some(surface));
+        }
+        window_try
+    }
+    pub fn find_window_in_space(&self, surface: &WlSurface) -> Option<&WindowElement> {
+        let mut window_try = self
+            .tile_space
+            .elements()
+            .find(|w| w.wl_surface().as_deref() == Some(surface));
         if window_try.is_none() {
             window_try = self
                 .slack_space
@@ -64,11 +77,7 @@ impl<BackendData: Backend> FlyjaState<BackendData> {
 
                 Some(window)
             }
-            None => self
-                .tile_space
-                .elements()
-                .find(|w| w.toplevel().unwrap().wl_surface() == surface)
-                .cloned(),
+            None => self.find_window_in_space(surface).cloned(),
         };
         if let Some(window) = window_try {
             let initial_configure_sent = with_states(surface, |states| {
@@ -106,23 +115,24 @@ impl<BackendData: Backend> FlyjaState<BackendData> {
     }
 }
 
-// TODO: remove to shell folder
 impl<BackendData: Backend> XdgShellHandler for FlyjaState<BackendData> {
     fn xdg_shell_state(&mut self) -> &mut XdgShellState {
         &mut self.xdg_shell_state
     }
     fn new_toplevel(&mut self, surface: ToplevelSurface) {
         let id = Id::unique();
-        let window = WindowElement::new_wayland_window(id, surface.clone());
+        let window = WindowElement::new_wayland_window(id, self.map_mode, surface.clone());
         self.pedding_windows.push(window);
     }
     fn toplevel_destroyed(&mut self, surface: ToplevelSurface) {
-        let window = self
+        let Some(window) = self
             .tile_space
             .elements()
             .find(|w| w.toplevel().unwrap().wl_surface() == surface.wl_surface())
-            .unwrap()
-            .clone();
+            .cloned()
+        else {
+            return;
+        };
 
         self.delete_window(window);
     }
@@ -146,15 +156,14 @@ impl<BackendData: Backend> XdgShellHandler for FlyjaState<BackendData> {
         if let Some(start_data) = check_grab(&seat, wl_surface, serial) {
             let pointer = seat.get_pointer().unwrap();
 
-            let window = self
-                .tile_space
-                .elements()
-                .find(|w| w.toplevel().unwrap().wl_surface() == wl_surface)
-                .unwrap()
-                .clone();
-            let initial_window_location = self.tile_space.element_location(&window).unwrap();
+            let window = self.find_window_in_space(wl_surface).unwrap().clone();
+            if window.mode == MapMode::Tile {
+                // TODO: implement later
+                return;
+            }
+            let initial_window_location = self.slack_space.element_location(&window).unwrap();
 
-            let grab = MoveSurfaceGrab {
+            let grab = MoveSurfaceGrabSlack {
                 start_data,
                 window,
                 initial_window_location,
@@ -167,7 +176,7 @@ impl<BackendData: Backend> XdgShellHandler for FlyjaState<BackendData> {
         let Configure::Toplevel(configure) = configure else {
             return;
         };
-        let Some(window) = self.find_window(&surface) else {
+        let Some(window) = self.find_window_with_pedding(&surface) else {
             return;
         };
         use xdg_decoration::zv1::server::zxdg_toplevel_decoration_v1::Mode;

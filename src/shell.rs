@@ -28,7 +28,7 @@ impl<BackendData: Backend> CompositorHandler for FlyjaState<BackendData> {
             while let Some(parent) = get_parent(&root) {
                 root = parent;
             }
-            if let Some(window) = self.find_window(surface) {
+            if let Some(window) = self.find_window_with_pedding(surface) {
                 window.on_commit();
             }
         };

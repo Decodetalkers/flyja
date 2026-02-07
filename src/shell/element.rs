@@ -23,6 +23,8 @@ use smithay::{
 
 use flyja_logic::{Id, Size as FlSize};
 
+use crate::state::MapMode;
+
 // This storage the size and other information
 #[derive(Debug, Clone)]
 pub struct WindowState {
@@ -35,6 +37,7 @@ pub struct WindowState {
 #[derive(Debug, Clone, PartialEq)]
 pub struct WindowElement {
     pub id: Id,
+    pub mode: MapMode,
     window: Window,
 }
 
@@ -46,9 +49,10 @@ impl Deref for WindowElement {
 }
 
 impl WindowElement {
-    pub fn new_wayland_window(id: Id, toplevel: ToplevelSurface) -> Self {
+    pub fn new_wayland_window(id: Id, mode: MapMode, toplevel: ToplevelSurface) -> Self {
         Self {
             id,
+            mode,
             window: Window::new_wayland_window(toplevel),
         }
     }
@@ -120,6 +124,9 @@ impl IsAlive for WindowElement {
 impl SpaceElement for WindowElement {
     fn geometry(&self) -> Rectangle<i32, Logical> {
         let mut geometry = SpaceElement::geometry(&self.window);
+        if self.mode == MapMode::Stack {
+            return geometry;
+        }
         let geometry_saved = self.state().geometry;
         geometry.size.w = geometry_saved.width as i32;
         geometry.size.h = geometry_saved.height as i32;

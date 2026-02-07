@@ -173,6 +173,7 @@ pub fn run_winit() {
         .shm_state
         .update_formats(state.backend_data.backend.renderer().shm_formats());
     state.tile_space.map_output(&output, (0, 0));
+    state.slack_space.map_output(&output, (0, 0));
     state.remap_space(SizeAndPos {
         size: Size {
             width: 0.,
@@ -222,7 +223,7 @@ pub fn run_winit() {
                             &mut framebuffer,
                             1.0,
                             0,
-                            [&state.tile_space, &state.slack_space],
+                            [&state.slack_space, &state.tile_space],
                             &[],
                             &mut state.backend_data.damager_tracker,
                             [0.1, 0.1, 0.1, 1.0],
@@ -231,6 +232,14 @@ pub fn run_winit() {
                     }
                     backend.submit(Some(&[damage])).unwrap();
 
+                    state.slack_space.elements().for_each(|window| {
+                        window.send_frame(
+                            &output,
+                            state.start_time.elapsed(),
+                            Some(Duration::ZERO),
+                            |_, _| Some(output.clone()),
+                        )
+                    });
                     state.tile_space.elements().for_each(|window| {
                         window.send_frame(
                             &output,
@@ -240,6 +249,7 @@ pub fn run_winit() {
                         )
                     });
 
+                    state.slack_space.refresh();
                     state.tile_space.refresh();
                     state.popups.cleanup();
                     let _ = state.display_handle.flush_clients();

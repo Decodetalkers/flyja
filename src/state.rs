@@ -90,6 +90,22 @@ pub enum TileState {
     Horizontal,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum MapMode {
+    #[default]
+    Tile,
+    Stack,
+}
+
+impl MapMode {
+    pub fn switch(&mut self) {
+        match self {
+            Self::Tile => *self = Self::Stack,
+            Self::Stack => *self = Self::Tile,
+        }
+    }
+}
+
 impl ClientData for ClientState {
     fn initialized(&self, _client_id: ClientId) {
         println!("initialized");
@@ -140,6 +156,7 @@ pub struct FlyjaState<BackendData: Backend + 'static> {
 
     pub cursor_status: CursorImageStatus,
     pub focused_id: Id,
+    pub map_mode: MapMode,
     pub tile_state: TileState,
     pub seat_name: String,
     pub seat: Seat<Self>,
@@ -263,6 +280,7 @@ impl<BackendData: Backend + 'static> FlyjaState<BackendData> {
 
             pointer,
             clock,
+            map_mode: MapMode::Tile,
             tile_state: TileState::Horizontal,
             viewporter_state,
             cursor_status: CursorImageStatus::default_named(),
@@ -273,6 +291,17 @@ impl<BackendData: Backend + 'static> FlyjaState<BackendData> {
         &self,
         pos: Point<f64, Logical>,
     ) -> Option<(WlSurface, Point<f64, Logical>)> {
+        if let Some(data) = self
+            .slack_space
+            .element_under(pos)
+            .and_then(|(window, location)| {
+                window
+                    .surface_under(pos - location.to_f64(), WindowSurfaceType::ALL)
+                    .map(|(s, p)| (s, (p + location).to_f64()))
+            })
+        {
+            return Some(data);
+        }
         self.tile_space
             .element_under(pos)
             .and_then(|(window, location)| {
@@ -291,9 +320,12 @@ impl<BackendData: Backend + 'static> FlyjaState<BackendData> {
     }
 
     pub fn insert_window_new(&mut self, window_in: WindowElement) {
+        if window_in.mode == MapMode::Stack {
+            self.slack_space.map_element(window_in, (10, 10), false);
+            return;
+        }
         let mut windows = HashMap::new();
         // NOTE: make sure current focused id always exists
-        println!("{}, {}", window_in.id, self.focused_id);
         self.map
             .insert_new(
                 window_in.id,
@@ -322,6 +354,9 @@ impl<BackendData: Backend + 'static> FlyjaState<BackendData> {
         self.focused_id = window_in.id;
     }
     pub fn delete_window(&mut self, window: WindowElement) {
+        if window.mode == MapMode::Stack {
+            return;
+        }
         let mut windows = HashMap::new();
         self.map
             .delete(window.id, &mut |id, size_and_pos| {
@@ -516,6 +551,15 @@ impl<BackendData: Backend> XdgActivationHandler for FlyjaState<BackendData> {
         if token_data.timestamp.elapsed().as_secs() < 10 {
             // Just grant the wish
             let w = self
+                .slack_space
+                .elements()
+                .find(|window| window.wl_surface().map(|s| *s == surface).unwrap_or(false))
+                .cloned();
+            if let Some(window) = w {
+                self.slack_space.raise_element(&window, true);
+                return;
+            }
+            let w = self
                 .tile_space
                 .elements()
                 .find(|window| window.wl_surface().map(|s| *s == surface).unwrap_or(false))
@@ -552,6 +596,11 @@ impl<BackendData: Backend> InputMethodHandler for FlyjaState<BackendData> {
     }
 
     fn parent_geometry(&self, parent: &WlSurface) -> Rectangle<i32, smithay::utils::Logical> {
+        if let Some(rectangle) = self.slack_space.elements().find_map(|window| {
+            (window.wl_surface().as_deref() == Some(parent)).then(|| window.geometry())
+        }) {
+            return rectangle;
+        }
         self.tile_space
             .elements()
             .find_map(|window| {
