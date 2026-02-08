@@ -10,9 +10,11 @@ use smithay::{
     desktop::{PopupKind, PopupManager, Space, WindowSurfaceType},
     input::{
         Seat, SeatHandler, SeatState,
-        keyboard::{XkbConfig, LedState},
-        pointer::{CursorImageStatus, PointerHandle},
+        dnd::{DnDGrab, DndGrabHandler, DndTarget, GrabType},
+        keyboard::{LedState, XkbConfig},
+        pointer::{CursorImageStatus, Focus, PointerHandle},
     },
+    output::Output,
     reexports::{
         calloop::{
             EventLoop, Interest, LoopHandle, LoopSignal, Mode, PostAction, generic::Generic,
@@ -27,7 +29,6 @@ use smithay::{
             protocol::{wl_buffer::WlBuffer, wl_surface::WlSurface},
         },
     },
-    output::Output,
     utils::{Clock, Logical, Monotonic, Point, Rectangle},
     wayland::{
         buffer::BufferHandler,
@@ -159,6 +160,8 @@ pub struct FlyjaState<BackendData: Backend + 'static> {
     pub commit_timing_manager_state: CommitTimingManagerState,
     pub keyboard_shortcuts_inhibit_state: KeyboardShortcutsInhibitState,
 
+    pub dnd_icon: Option<DndIcon>,
+
     pub cursor_status: CursorImageStatus,
     pub focused_id: Id,
     pub map_mode: MapMode,
@@ -282,6 +285,8 @@ impl<BackendData: Backend + 'static> FlyjaState<BackendData> {
             shm_state,
             commit_timing_manager_state,
             data_control_state,
+
+            dnd_icon: None,
 
             pointer,
             clock,
@@ -440,7 +445,61 @@ impl<BackendData: Backend> DataControlHandler for FlyjaState<BackendData> {
 
 delegate_ext_data_control!(@<BackendData: Backend + 'static> FlyjaState<BackendData>);
 
-impl<BackendData: Backend> WaylandDndGrabHandler for FlyjaState<BackendData> {}
+#[derive(Debug)]
+pub struct DndIcon {
+    pub surface: WlSurface,
+    pub offset: Point<i32, Logical>,
+}
+
+impl<BackendData: Backend> WaylandDndGrabHandler for FlyjaState<BackendData> {
+    fn dnd_requested<S: smithay::input::dnd::Source>(
+        &mut self,
+        source: S,
+        icon: Option<WlSurface>,
+        seat: Seat<Self>,
+        serial: smithay::utils::Serial,
+        type_: smithay::input::dnd::GrabType,
+    ) {
+        self.dnd_icon = icon.map(|surface| DndIcon {
+            surface,
+            offset: (0, 0).into(),
+        });
+
+        match type_ {
+            GrabType::Pointer => {
+                let pointer = seat.get_pointer().unwrap();
+                let start_data = pointer.grab_start_data().unwrap();
+                pointer.set_grab(
+                    self,
+                    DnDGrab::new_pointer(&self.display_handle, start_data, source, seat),
+                    serial,
+                    Focus::Keep,
+                );
+            }
+            GrabType::Touch => {
+                let touch = seat.get_touch().unwrap();
+                let start_data = touch.grab_start_data().unwrap();
+                touch.set_grab(
+                    self,
+                    DnDGrab::new_touch(&self.display_handle, start_data, source, seat),
+                    serial,
+                );
+            }
+        }
+    }
+}
+
+impl<BackendData: Backend> DndGrabHandler for FlyjaState<BackendData> {
+    fn dropped(
+        &mut self,
+        _target: Option<DndTarget<'_, Self>>,
+        _validated: bool,
+        _seat: Seat<Self>,
+        _location: Point<f64, Logical>,
+    ) {
+        self.dnd_icon = None;
+    }
+}
 
 impl<BackendData: Backend> SeatHandler for FlyjaState<BackendData> {
     type KeyboardFocus = WlSurface;
