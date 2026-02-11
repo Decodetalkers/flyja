@@ -8,13 +8,16 @@ use smithay::{
             exporter::gbm::GbmFramebufferExporter,
             output::{DrmOutput, DrmOutputManager},
         },
+        egl::{EGLContext, context::ContextPriority},
+        input::InputEvent,
+        libinput::{LibinputInputBackend, LibinputSessionInterface},
         renderer::{
             ImportDma,
             gles::GlesRenderer,
             multigpu::{GpuManager, gbm::GbmGlesBackend},
         },
-        session::{Session, libseat::LibSeatSession},
-        udev::{all_gpus, primary_gpu},
+        session::{Event as SessionEvent, Session, libseat::LibSeatSession},
+        udev::{UdevBackend, all_gpus, primary_gpu},
     },
     delegate_dmabuf,
     desktop::utils::OutputPresentationFeedback,
@@ -23,6 +26,7 @@ use smithay::{
     reexports::{
         calloop::{EventLoop, RegistrationToken},
         drm::control::{connector, crtc},
+        input::{DeviceCapability, Libinput, LibinputInterface},
         wayland_server::{Display, DisplayHandle, backend::GlobalId, protocol::wl_surface},
     },
     utils::{Monotonic, Time},
@@ -204,4 +208,90 @@ pub fn run_udev() {
         });
 
     tracing::info!("Using {} as primary gpu.", primary_gpu);
+
+    let gpus = GpuManager::new(GbmGlesBackend::with_factory(|display| {
+        let context = EGLContext::new_with_priority(display, ContextPriority::High)?;
+        // TODO: maybe need an environment value
+        let capabilities = unsafe { GlesRenderer::supported_capabilities(&context)? };
+        Ok(unsafe { GlesRenderer::with_capabilities(context, capabilities)? })
+    }))
+    .unwrap();
+
+    let data = UdevData {
+        dh: display_handle.clone(),
+        dmabuf_sate: None,
+        syncobj_state: None,
+        session,
+        primary_gpu,
+        gpus,
+        backends: HashMap::new(),
+        keyboards: Vec::new(),
+    };
+
+    let mut state = FlyjaState::init(display, &event_loop, data, true);
+
+    let udev_backend = match UdevBackend::new(&state.seat_name) {
+        Ok(ret) => ret,
+        Err(err) => {
+            tracing::error!(error = ?err, "Failed to initlialize udev backend");
+            return;
+        }
+    };
+
+    let mut libinput_context = Libinput::new_with_udev::<LibinputSessionInterface<LibSeatSession>>(
+        state.backend_data.session.clone().into(),
+    );
+
+    /*
+     * initlialize libinput backend
+     */
+    libinput_context.udev_assign_seat(&state.seat_name).unwrap();
+    let libinput_backend = LibinputInputBackend::new(libinput_context.clone());
+
+    /*
+     * About the Device and input
+     */
+    event_loop
+        .handle()
+        .insert_source(libinput_backend, move |mut event, _, data| {
+            //let dh = data.backend_data.dh.clone();
+            if let InputEvent::DeviceAdded { device } = &mut event {
+                if device.has_capability(DeviceCapability::Keyboard) {
+                    if let Some(led_state) = data
+                        .seat
+                        .get_keyboard()
+                        .map(|keyboard| keyboard.led_state())
+                    {
+                        device.led_update(led_state.into());
+                    }
+                    data.backend_data.keyboards.push(device.clone());
+                }
+            } else if let InputEvent::DeviceRemoved { ref device } = event {
+                if device.has_capability(DeviceCapability::Keyboard) {
+                    data.backend_data.keyboards.retain(|item| item != device);
+                }
+            }
+            data.process_input_event(event);
+        })
+        .unwrap();
+
+    event_loop
+        .handle()
+        .insert_source(notifier, move |event, &mut (), data| match event {
+            SessionEvent::PauseSession => {
+                libinput_context.suspend();
+                tracing::info!("pausing session");
+                for backend in data.backend_data.backends.values_mut() {
+                    backend.drm_output_manager.pause();
+                    backend.active_leases.clear();
+                    if let Some(lease_global) = backend.leasing_global.as_mut() {
+                        lease_global.suspend();
+                    }
+                }
+            }
+            SessionEvent::ActivateSession => {
+                // NOTE: render
+            }
+        })
+        .unwrap();
 }
