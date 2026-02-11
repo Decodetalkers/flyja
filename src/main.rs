@@ -4,8 +4,8 @@ mod grabs;
 mod input_handler;
 mod shell;
 mod state;
-mod winit;
 mod udev;
+mod winit;
 fn main() {
     tracing_subscriber::fmt().init();
     run_winit();

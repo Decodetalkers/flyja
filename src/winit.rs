@@ -212,6 +212,12 @@ pub fn run_winit() {
                 }
                 WinitEvent::Input(event) => state.process_input_event(event),
                 WinitEvent::Redraw => {
+                    let now = state.clock.now();
+                    let frame_target = now
+                        + output
+                            .current_mode()
+                            .map(|mode| Duration::from_secs_f64(1_000f64 / mode.refresh as f64))
+                            .unwrap_or_default();
                     let backend = &mut state.backend_data.backend;
                     let size = backend.window_size();
                     let damage = Rectangle::from_size(size);
@@ -239,20 +245,14 @@ pub fn run_winit() {
                     backend.submit(Some(&[damage])).unwrap();
 
                     state.slack_space.elements().for_each(|window| {
-                        window.send_frame(
-                            &output,
-                            state.start_time.elapsed(),
-                            Some(Duration::ZERO),
-                            |_, _| Some(output.clone()),
-                        )
+                        window.send_frame(&output, frame_target, Some(Duration::ZERO), |_, _| {
+                            Some(output.clone())
+                        })
                     });
                     state.tile_space.elements().for_each(|window| {
-                        window.send_frame(
-                            &output,
-                            state.start_time.elapsed(),
-                            Some(Duration::ZERO),
-                            |_, _| Some(output.clone()),
-                        )
+                        window.send_frame(&output, frame_target, Some(Duration::ZERO), |_, _| {
+                            Some(output.clone())
+                        })
                     });
 
                     state.slack_space.refresh();

@@ -130,7 +130,6 @@ pub trait Backend {
 
 pub struct FlyjaState<BackendData: Backend + 'static> {
     pub backend_data: BackendData,
-    pub start_time: std::time::Instant,
 
     pub socket_name: Option<String>,
     pub display_handle: DisplayHandle,
@@ -255,10 +254,8 @@ impl<BackendData: Backend + 'static> FlyjaState<BackendData> {
             .expect("We need keyboard");
         let keyboard_shortcuts_inhibit_state = KeyboardShortcutsInhibitState::new::<Self>(&dh);
         let signal = event_loop.get_signal();
-        let start_time = std::time::Instant::now();
 
         Self {
-            start_time,
             backend_data,
             display_handle: dh,
             socket_name,

@@ -19,7 +19,7 @@ use smithay::{
         session::{Event as SessionEvent, Session, libseat::LibSeatSession},
         udev::{UdevBackend, all_gpus, primary_gpu},
     },
-    delegate_dmabuf,
+    delegate_dmabuf, delegate_drm_lease,
     desktop::utils::OutputPresentationFeedback,
     input::keyboard::LedState,
     output::Output,
@@ -32,7 +32,10 @@ use smithay::{
     utils::{Monotonic, Time},
     wayland::{
         dmabuf::{DmabufGlobal, DmabufHandler, DmabufState, ImportNotifier},
-        drm_lease::{DrmLease, DrmLeaseState},
+        drm_lease::{
+            DrmLease, DrmLeaseBuilder, DrmLeaseHandler, DrmLeaseRequest, DrmLeaseState,
+            LeaseRejected,
+        },
         drm_syncobj::DrmSyncobjState,
     },
 };
@@ -290,8 +293,109 @@ pub fn run_udev() {
                 }
             }
             SessionEvent::ActivateSession => {
+                tracing::info!("resuming session");
+
+                if libinput_context.resume().is_err() {
+                    tracing::error!("Failed to resume libinput context");
+                }
+                for (node, backend) in data
+                    .backend_data
+                    .backends
+                    .iter_mut()
+                    .map(|(handle, backend)| (*handle, backend))
+                {
+                    // if we do not care about flicking (caused by modesetting) we could just
+                    // pass true for disable connectors here. this would make sure our drm
+                    // device is in a known state (all connectors and planes disabled).
+                    // but for demonstration we choose a more optimistic path by leaving the
+                    // state as is and assume it will just work. If this assumption fails
+                    // we will try to reset the state when trying to queue a frame.
+                    backend
+                        .drm_output_manager
+                        .lock()
+                        .activate(false)
+                        .expect("failed to activate drm backend");
+                    if let Some(lease_global) = backend.leasing_global.as_mut() {
+                        lease_global.resume::<FlyjaState<UdevData>>();
+                    }
+                }
                 // NOTE: render
             }
         })
         .unwrap();
 }
+
+impl DrmLeaseHandler for FlyjaState<UdevData> {
+    fn drm_lease_state(&mut self, node: DrmNode) -> &mut DrmLeaseState {
+        self.backend_data
+            .backends
+            .get_mut(&node)
+            .unwrap()
+            .leasing_global
+            .as_mut()
+            .unwrap()
+    }
+
+    fn lease_request(
+        &mut self,
+        node: DrmNode,
+        request: DrmLeaseRequest,
+    ) -> Result<DrmLeaseBuilder, LeaseRejected> {
+        let backend = self
+            .backend_data
+            .backends
+            .get(&node)
+            .ok_or(LeaseRejected::default())?;
+
+        let drm_device = backend.drm_output_manager.device();
+        let mut builder = DrmLeaseBuilder::new(drm_device);
+        for conn in request.connectors {
+            if let Some((_, crtc)) = backend
+                .non_desktop_connectors
+                .iter()
+                .find(|(handle, _)| *handle == conn)
+            {
+                builder.add_connector(conn);
+                builder.add_crtc(*crtc);
+                let planes = drm_device.planes(crtc).map_err(LeaseRejected::with_cause)?;
+                let (primary_plane, primary_plane_claim) = planes
+                    .primary
+                    .iter()
+                    .find_map(|plane| {
+                        drm_device
+                            .claim_plane(plane.handle, *crtc)
+                            .map(|claim| (plane, claim))
+                    })
+                    .ok_or_else(LeaseRejected::default)?;
+                builder.add_plane(primary_plane.handle, primary_plane_claim);
+                if let Some((cursor, claim)) = planes.cursor.iter().find_map(|plane| {
+                    drm_device
+                        .claim_plane(plane.handle, *crtc)
+                        .map(|claim| (plane, claim))
+                }) {
+                    builder.add_plane(cursor.handle, claim);
+                }
+            } else {
+                tracing::warn!(
+                    ?conn,
+                    "Lease requested for desktop connector, denying request"
+                );
+                return Err(LeaseRejected::default());
+            }
+        }
+
+        Ok(builder)
+    }
+
+    fn new_active_lease(&mut self, node: DrmNode, lease: DrmLease) {
+        let backend = self.backend_data.backends.get_mut(&node).unwrap();
+        backend.active_leases.push(lease);
+    }
+
+    fn lease_destroyed(&mut self, node: DrmNode, lease: u32) {
+        let backend = self.backend_data.backends.get_mut(&node).unwrap();
+        backend.active_leases.retain(|l| l.id() != lease);
+    }
+}
+
+delegate_drm_lease!(FlyjaState<UdevData>);
