@@ -52,6 +52,7 @@ struct DmabufStateFly {
     global: DmabufGlobal,
 }
 
+#[derive(Debug, PartialEq)]
 struct UdevOutputId {
     device_id: DrmNode,
     crtc: crtc::Handle,
@@ -318,11 +319,55 @@ pub fn run_udev() {
                     if let Some(lease_global) = backend.leasing_global.as_mut() {
                         lease_global.resume::<FlyjaState<UdevData>>();
                     }
+
+                    data.handle
+                        .insert_idle(move |data| data.render(node, None, data.clock.now()));
                 }
                 // NOTE: render
             }
         })
         .unwrap();
+}
+
+impl FlyjaState<UdevData> {
+    fn render(&mut self, node: DrmNode, crtc: Option<crtc::Handle>, frame_target: Time<Monotonic>) {
+        let device_backend = match self.backend_data.backends.get_mut(&node) {
+            Some(backend) => backend,
+            None => {
+                tracing::error!("Trying to render on non-existedn backend {}", node);
+                return;
+            }
+        };
+
+        if let Some(crtc) = crtc {
+            self.render_surface(node, crtc, frame_target);
+        } else {
+            let crtcs: Vec<_> = device_backend.surfaces.keys().copied().collect();
+            for crtc in crtcs {
+                self.render_surface(node, crtc, frame_target);
+            }
+        }
+    }
+
+    fn render_surface(&mut self, node: DrmNode, crtc: crtc::Handle, frame_target: Time<Monotonic>) {
+        profiling::scope!("render_surface", &format!("{crtc:?}"));
+        // TODO: the logic maybe needed to be updated later
+        // TODO: layershell
+        //let output = if let Some(output) = self.tile_space.outputs().find(|o| {
+        //    o.user_data().get::<UdevOutputId>()
+        //        == Some(&UdevOutputId {
+        //            device_id: node,
+        //            crtc,
+        //        })
+        //}) {
+        //    output.clone()
+        //} else {
+        //    // somehow we got called with an invalid output
+        //    return;
+        //};
+
+        self.pre_paint(frame_target);
+    }
 }
 
 impl DrmLeaseHandler for FlyjaState<UdevData> {

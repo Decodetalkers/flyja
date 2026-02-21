@@ -7,7 +7,9 @@ use smithay::{
     delegate_relative_pointer, delegate_seat, delegate_shm, delegate_tablet_manager,
     delegate_text_input_manager, delegate_viewporter, delegate_virtual_keyboard_manager,
     delegate_xdg_activation, delegate_xdg_decoration, delegate_xdg_foreign,
-    desktop::{PopupKind, PopupManager, Space, WindowSurfaceType},
+    desktop::{
+        PopupKind, PopupManager, Space, WindowSurfaceType, utils::with_surfaces_surface_tree,
+    },
     input::{
         Seat, SeatHandler, SeatState,
         dnd::{DnDGrab, DndGrabHandler, DndTarget, GrabType},
@@ -24,16 +26,18 @@ use smithay::{
             zv1::server::zxdg_toplevel_decoration_v1::Mode as DecorationMode,
         },
         wayland_server::{
-            Display, DisplayHandle, Resource,
+            Client, Display, DisplayHandle, Resource,
             backend::{ClientData, ClientId, DisconnectReason},
             protocol::{wl_buffer::WlBuffer, wl_surface::WlSurface},
         },
     },
-    utils::{Clock, Logical, Monotonic, Point, Rectangle},
+    utils::{Clock, Logical, Monotonic, Point, Rectangle, Time},
     wayland::{
         buffer::BufferHandler,
-        commit_timing::CommitTimingManagerState,
-        compositor::{CompositorClientState, CompositorState},
+        commit_timing::{
+            CommitTimerBarrierStateUserData, CommitTimerStateUserData, CommitTimingManagerState,
+        },
+        compositor::{CompositorClientState, CompositorHandler, CompositorState},
         input_method::{
             InputMethodHandler, InputMethodManagerState, PopupSurface as ImPopupSurface,
         },
@@ -408,6 +412,74 @@ impl<BackendData: Backend + 'static> FlyjaState<BackendData> {
             window.resize(size_and_pos.size);
             self.tile_space
                 .map_element(window, (pos.x as i32, pos.y as i32), true);
+        }
+    }
+
+    // TODO: use output to update the layershell
+    pub fn pre_paint(&mut self, frame_target: impl Into<Time<Monotonic>>) {
+        let frame_target = frame_target.into();
+
+        let mut clients: HashMap<ClientId, Client> = HashMap::new();
+
+        self.tile_space.elements().for_each(|window| {
+            window.with_surfaces(|surface, states| {
+                if let Some(mut commit_timer_state) = states
+                    .data_map
+                    .get::<CommitTimerBarrierStateUserData>()
+                    .map(|commit_timer| commit_timer.lock().unwrap())
+                {
+                    commit_timer_state.signal_until(frame_target);
+                    let client = surface.client().unwrap();
+                    clients.insert(client.id(), client);
+                }
+            });
+        });
+        self.slack_space.elements().for_each(|window| {
+            window.with_surfaces(|surface, states| {
+                if let Some(mut commit_timer_state) = states
+                    .data_map
+                    .get::<CommitTimerBarrierStateUserData>()
+                    .map(|commit_timer| commit_timer.lock().unwrap())
+                {
+                    commit_timer_state.signal_until(frame_target);
+                    let client = surface.client().unwrap();
+                    clients.insert(client.id(), client);
+                }
+            });
+        });
+
+        // TODO: layershell
+        if let CursorImageStatus::Surface(ref surface) = self.cursor_status {
+            with_surfaces_surface_tree(surface, |surface, states| {
+                if let Some(mut commit_timer_state) = states
+                    .data_map
+                    .get::<CommitTimerBarrierStateUserData>()
+                    .map(|commit_timer| commit_timer.lock().unwrap())
+                {
+                    commit_timer_state.signal_until(frame_target);
+                    let client = surface.client().unwrap();
+                    clients.insert(client.id(), client);
+                }
+            });
+        }
+        if let Some(surface) = self.dnd_icon.as_ref().map(|icon| &icon.surface) {
+            with_surfaces_surface_tree(surface, |surface, states| {
+                if let Some(mut commit_timer_state) = states
+                    .data_map
+                    .get::<CommitTimerBarrierStateUserData>()
+                    .map(|commit_timer| commit_timer.lock().unwrap())
+                {
+                    commit_timer_state.signal_until(frame_target);
+                    let client = surface.client().unwrap();
+                    clients.insert(client.id(), client);
+                }
+            });
+        }
+
+        let dh = self.display_handle.clone();
+        for client in clients.into_values() {
+            self.client_compositor_state(&client)
+                .blocker_cleared(self, &dh);
         }
     }
 }
