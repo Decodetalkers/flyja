@@ -22,4 +22,6 @@ smithay = { git = "https://github.com/Smithay/smithay.git", features = [
 	"backend_egl",
 	"use_system_lib",
 ] }
+smithay-drm-extras = { git = "https://github.com/Smithay/smithay.git", package = "smithay-drm-extras" }
 profiling = "1.0"
+xcursor = "0.3.10"

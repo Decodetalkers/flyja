@@ -7,12 +7,16 @@ use smithay::{
     delegate_relative_pointer, delegate_seat, delegate_shm, delegate_tablet_manager,
     delegate_text_input_manager, delegate_viewporter, delegate_virtual_keyboard_manager,
     delegate_xdg_activation, delegate_xdg_decoration, delegate_xdg_foreign,
-    desktop::{PopupKind, PopupManager, Space, WindowSurfaceType},
+    desktop::{
+        PopupKind, PopupManager, Space, WindowSurfaceType, utils::with_surfaces_surface_tree,
+    },
     input::{
         Seat, SeatHandler, SeatState,
-        keyboard::XkbConfig,
-        pointer::{CursorImageStatus, PointerHandle},
+        dnd::{DnDGrab, DndGrabHandler, DndTarget, GrabType},
+        keyboard::{LedState, XkbConfig},
+        pointer::{CursorImageStatus, Focus, PointerHandle},
     },
+    output::Output,
     reexports::{
         calloop::{
             EventLoop, Interest, LoopHandle, LoopSignal, Mode, PostAction, generic::Generic,
@@ -22,16 +26,18 @@ use smithay::{
             zv1::server::zxdg_toplevel_decoration_v1::Mode as DecorationMode,
         },
         wayland_server::{
-            Display, DisplayHandle, Resource,
+            Client, Display, DisplayHandle, Resource,
             backend::{ClientData, ClientId, DisconnectReason},
             protocol::{wl_buffer::WlBuffer, wl_surface::WlSurface},
         },
     },
-    utils::{Clock, Logical, Monotonic, Point, Rectangle},
+    utils::{Clock, Logical, Monotonic, Point, Rectangle, Time},
     wayland::{
         buffer::BufferHandler,
-        commit_timing::CommitTimingManagerState,
-        compositor::{CompositorClientState, CompositorState},
+        commit_timing::{
+            CommitTimerBarrierStateUserData, CommitTimerStateUserData, CommitTimingManagerState,
+        },
+        compositor::{CompositorClientState, CompositorHandler, CompositorState},
         input_method::{
             InputMethodHandler, InputMethodManagerState, PopupSurface as ImPopupSurface,
         },
@@ -47,7 +53,7 @@ use smithay::{
         relative_pointer::RelativePointerManagerState,
         seat::WaylandFocus,
         selection::{
-            SelectionHandler, SelectionSource, SelectionTarget,
+            SelectionHandler,
             data_device::{
                 DataDeviceHandler, DataDeviceState, WaylandDndGrabHandler, set_data_device_focus,
             },
@@ -57,7 +63,7 @@ use smithay::{
             },
         },
         shell::xdg::{
-            PopupSurface, PositionerState, ToplevelSurface, XdgShellHandler, XdgShellState,
+            ToplevelSurface, XdgShellState,
             decoration::{XdgDecorationHandler, XdgDecorationState},
         },
         shm::{ShmHandler, ShmState},
@@ -120,11 +126,14 @@ pub trait Backend {
     const HAS_RELATIVE_MOTION: bool = false;
     const HAS_GUSTURES: bool = false;
     fn seat_name(&self) -> String;
+
+    fn reset_buffers(&mut self, output: &Output);
+    fn early_import(&mut self, surface: &WlSurface);
+    fn update_led_state(&mut self, led_state: LedState);
 }
 
 pub struct FlyjaState<BackendData: Backend + 'static> {
     pub backend_data: BackendData,
-    pub start_time: std::time::Instant,
 
     pub socket_name: Option<String>,
     pub display_handle: DisplayHandle,
@@ -153,6 +162,8 @@ pub struct FlyjaState<BackendData: Backend + 'static> {
     pub xdg_activation_state: XdgActivationState,
     pub commit_timing_manager_state: CommitTimingManagerState,
     pub keyboard_shortcuts_inhibit_state: KeyboardShortcutsInhibitState,
+
+    pub dnd_icon: Option<DndIcon>,
 
     pub cursor_status: CursorImageStatus,
     pub focused_id: Id,
@@ -247,10 +258,8 @@ impl<BackendData: Backend + 'static> FlyjaState<BackendData> {
             .expect("We need keyboard");
         let keyboard_shortcuts_inhibit_state = KeyboardShortcutsInhibitState::new::<Self>(&dh);
         let signal = event_loop.get_signal();
-        let start_time = std::time::Instant::now();
 
         Self {
-            start_time,
             backend_data,
             display_handle: dh,
             socket_name,
@@ -277,6 +286,8 @@ impl<BackendData: Backend + 'static> FlyjaState<BackendData> {
             shm_state,
             commit_timing_manager_state,
             data_control_state,
+
+            dnd_icon: None,
 
             pointer,
             clock,
@@ -403,6 +414,74 @@ impl<BackendData: Backend + 'static> FlyjaState<BackendData> {
                 .map_element(window, (pos.x as i32, pos.y as i32), true);
         }
     }
+
+    // TODO: use output to update the layershell
+    pub fn pre_paint(&mut self, frame_target: impl Into<Time<Monotonic>>) {
+        let frame_target = frame_target.into();
+
+        let mut clients: HashMap<ClientId, Client> = HashMap::new();
+
+        self.tile_space.elements().for_each(|window| {
+            window.with_surfaces(|surface, states| {
+                if let Some(mut commit_timer_state) = states
+                    .data_map
+                    .get::<CommitTimerBarrierStateUserData>()
+                    .map(|commit_timer| commit_timer.lock().unwrap())
+                {
+                    commit_timer_state.signal_until(frame_target);
+                    let client = surface.client().unwrap();
+                    clients.insert(client.id(), client);
+                }
+            });
+        });
+        self.slack_space.elements().for_each(|window| {
+            window.with_surfaces(|surface, states| {
+                if let Some(mut commit_timer_state) = states
+                    .data_map
+                    .get::<CommitTimerBarrierStateUserData>()
+                    .map(|commit_timer| commit_timer.lock().unwrap())
+                {
+                    commit_timer_state.signal_until(frame_target);
+                    let client = surface.client().unwrap();
+                    clients.insert(client.id(), client);
+                }
+            });
+        });
+
+        // TODO: layershell
+        if let CursorImageStatus::Surface(ref surface) = self.cursor_status {
+            with_surfaces_surface_tree(surface, |surface, states| {
+                if let Some(mut commit_timer_state) = states
+                    .data_map
+                    .get::<CommitTimerBarrierStateUserData>()
+                    .map(|commit_timer| commit_timer.lock().unwrap())
+                {
+                    commit_timer_state.signal_until(frame_target);
+                    let client = surface.client().unwrap();
+                    clients.insert(client.id(), client);
+                }
+            });
+        }
+        if let Some(surface) = self.dnd_icon.as_ref().map(|icon| &icon.surface) {
+            with_surfaces_surface_tree(surface, |surface, states| {
+                if let Some(mut commit_timer_state) = states
+                    .data_map
+                    .get::<CommitTimerBarrierStateUserData>()
+                    .map(|commit_timer| commit_timer.lock().unwrap())
+                {
+                    commit_timer_state.signal_until(frame_target);
+                    let client = surface.client().unwrap();
+                    clients.insert(client.id(), client);
+                }
+            });
+        }
+
+        let dh = self.display_handle.clone();
+        for client in clients.into_values() {
+            self.client_compositor_state(&client)
+                .blocker_cleared(self, &dh);
+        }
+    }
 }
 
 impl<BackendData: Backend> ShmHandler for FlyjaState<BackendData> {
@@ -435,7 +514,61 @@ impl<BackendData: Backend> DataControlHandler for FlyjaState<BackendData> {
 
 delegate_ext_data_control!(@<BackendData: Backend + 'static> FlyjaState<BackendData>);
 
-impl<BackendData: Backend> WaylandDndGrabHandler for FlyjaState<BackendData> {}
+#[derive(Debug)]
+pub struct DndIcon {
+    pub surface: WlSurface,
+    pub offset: Point<i32, Logical>,
+}
+
+impl<BackendData: Backend> WaylandDndGrabHandler for FlyjaState<BackendData> {
+    fn dnd_requested<S: smithay::input::dnd::Source>(
+        &mut self,
+        source: S,
+        icon: Option<WlSurface>,
+        seat: Seat<Self>,
+        serial: smithay::utils::Serial,
+        type_: smithay::input::dnd::GrabType,
+    ) {
+        self.dnd_icon = icon.map(|surface| DndIcon {
+            surface,
+            offset: (0, 0).into(),
+        });
+
+        match type_ {
+            GrabType::Pointer => {
+                let pointer = seat.get_pointer().unwrap();
+                let start_data = pointer.grab_start_data().unwrap();
+                pointer.set_grab(
+                    self,
+                    DnDGrab::new_pointer(&self.display_handle, start_data, source, seat),
+                    serial,
+                    Focus::Keep,
+                );
+            }
+            GrabType::Touch => {
+                let touch = seat.get_touch().unwrap();
+                let start_data = touch.grab_start_data().unwrap();
+                touch.set_grab(
+                    self,
+                    DnDGrab::new_touch(&self.display_handle, start_data, source, seat),
+                    serial,
+                );
+            }
+        }
+    }
+}
+
+impl<BackendData: Backend> DndGrabHandler for FlyjaState<BackendData> {
+    fn dropped(
+        &mut self,
+        _target: Option<DndTarget<'_, Self>>,
+        _validated: bool,
+        _seat: Seat<Self>,
+        _location: Point<f64, Logical>,
+    ) {
+        self.dnd_icon = None;
+    }
+}
 
 impl<BackendData: Backend> SeatHandler for FlyjaState<BackendData> {
     type KeyboardFocus = WlSurface;

@@ -78,7 +78,7 @@ impl<BackendData: Backend> FlyjaState<BackendData> {
 
                 let serial = SERIAL_COUNTER.next_serial();
 
-                let pointer = self.seat.get_pointer().unwrap();
+                let pointer = self.pointer.clone();
 
                 let under = self.surface_under(pos);
 
